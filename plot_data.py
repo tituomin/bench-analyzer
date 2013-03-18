@@ -9,8 +9,24 @@ SEPARATOR = ','
 NUMERICAL = '[0-9]+'
 re_numerical = re.compile(NUMERICAL)
 
-keydict = {}
-labels = []
+dependencies = [
+    # if key (left) chosen as variable,
+    # corresponding keys (right) must be removed
+    # since they are not independent from the key
+    ('parameter_count'        , 'parameter_type_.+count'),
+    ('parameter_type_count'   , 'parameter_count'),
+    ('parameter_type_.+count' , 'parameter_count')]
+
+def remove_dependencies(series, sorted_keys, variable):
+    for benchmark in benchmarks:
+        for var, removable in dependencies:
+            if re.match(var, variable):
+                for key in benchmark.keys():
+                    if re.match(removable, key):
+                        del benchmark[key]
+                for key in sorted_keys:
+                    if re.match(removable, key):
+                        sorted_keys.remove(key)
 
 def explode(line):
     return line.split(SEPARATOR)
@@ -25,27 +41,52 @@ def value(string):
 def read_datafile(f):
     benchmarks = []
     labels = explode(f.readline())[:-1]
-    for i, label in enumerate(labels):
-        keydict[label] = i
     for line in f:
         benchmarks.append(
-            explode(line)[:-1])
-
+            dict([(key,value(string)) for key, string in
+                   zip(labels, explode(line)[:-1])]))
+            
     return benchmarks
 
 def extract_data(benchmarks, group, variable, measure):
-    group_elements = explode(group)
-    groups = itertools.product(group_elements, repeat=2)
+    series_collection = []
 
-    key_complement = set(labels)
-    key_complement.remove(variable)
+    exclude_list = explode(group)
+    exclude_list.append(variable)
+    exclude_list.append(measure)
 
-    sorted_keys = list(key_complement)
-    sorted_keys.append(variable)
+    labels = benchmarks[0].keys()
+    sorted_keys = filter(lambda x: not x in exclude_list, labels)
+    sorted_keys.extend(exclude_list)
+
+    controlled_variables = filter(lambda x: not x in exclude_list, labels)
+
     compare_function = functools.partial(comp_function, sorted_keys)
-
     sorted_benchmarks = sorted(benchmarks, cmp=compare_function)
-    return sorted_benchmarks
+
+    last_fixed = None
+    series = []
+    for benchmark in sorted_benchmarks:
+        fixed_data = tuple()
+        for key in controlled_variables:
+            fixed_data += benchmark[key],
+
+        element = {
+            'fixed' : fixed_data,
+            variable : benchmark[variable],
+            measure : benchmark[measure],
+            group : benchmark[group]}
+
+        if last_fixed == fixed_data:
+            series.append(element)
+
+        else:
+            series_collection.append(series)
+            series = [element]
+
+        last_fixed = fixed_data
+        
+    return series_collection, sorted_keys
 
 def comp_function(keys, left, right):
     for key in keys:
@@ -64,11 +105,14 @@ def comp_function(keys, left, right):
             if l == r:
                 return 0
 
-def print_benchmark(bm):
-    for key in bm.keys():
-        print str(bm[key]),
-    print
-    
+def print_benchmarks(data, sorted_keys):
+    i = 0
+    for series in data:
+        for benchmark in series:
+            if i == 0:
+                print ' '.join(benchmark.keys())
+            print ' '.join(benchmark.values())
+        print ' ---------- '
 
 if __name__ == '__main__':
     if len(argv) != 5:
@@ -86,14 +130,11 @@ if __name__ == '__main__':
     finally:
         f.close()
 
-    data = extract_data(benchmarks, group, variable, measure)
+    data, keys = extract_data(benchmarks, group, variable, measure)
+    remove_dependencies(data, keys, variable)
 
-    print(' '.join(data[0].keys()))
-    for bm in data:
-        print_benchmark(bm)
+    print_benchmarks(data, keys)
 
-    print(len(data[0].keys()))
-        
     exit(0)
 
 
