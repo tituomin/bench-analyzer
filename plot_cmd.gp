@@ -1,2 +1,2 @@
 
-plot "data.txt" title "foo" with linespoints
+plot for [i=2:5] 'data.txt' using i title columnhead with linespoints
