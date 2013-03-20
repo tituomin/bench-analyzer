@@ -8,6 +8,28 @@ import pprint
 
 pp = pprint.PrettyPrinter(depth=10, indent=4)
 
+types = [
+        'boolean[]',
+        'boolean',
+        'byte[]',
+        'byte',
+        'char[]',
+        'char',
+        'double[]',
+        'double',
+        'float[]',
+        'float',
+        'int[]',
+        'int',
+        'long[]',
+        'long',
+        'short[]',
+        'short',
+        'java.lang.Class',
+        'java.lang.Object[]',
+        'java.lang.Object',
+        'java.lang.String',
+        'java.lang.Throwable']
 
 SEPARATOR = ','
 NUMERICAL = '[0-9]+'
@@ -23,17 +45,28 @@ def value(string):
         return int(string)
     return string
 
-def read_datafile(f, variable):
+def add_derived_values(benchmark):
+    if (benchmark['parameter_type_count'] == 1):
+        for tp in types:
+            if benchmark['parameter_type_{t}_count'.format(t=tp)] != None:
+                single_type = tp
+                break
+    else:
+        single_type = None
+    benchmark['single_type'] = single_type
+
+def read_datafile(f):
     benchmarks = []
     labels = explode(f.readline())[:-1]
     for line in f:
-        benchmarks.append(
-            dict([(key,value(string)) for key, string in
-                   zip(labels, explode(line)[:-1])]))
+        benchmark = dict([(key,value(string)) for key, string in
+                          zip(labels, explode(line)[:-1])])
+        add_derived_values(benchmark)
+        benchmarks.append(benchmark)
             
     return benchmarks
 
-def extract_data(benchmarks, group, variable, measure):
+def extract_data(benchmarks, group=None, variable=None, measure=None):
     series_collection = []
 
     focus = explode(group)
@@ -109,15 +142,16 @@ def comp_function(keys, left, right):
     return 0        
             
 
-def print_benchmarks(data, group, variable, measure):
+def print_benchmarks(data, group=None, variable=None, measure=None):
+    result = ""
     for series in data:
         headers = []
         headers.append(variable)
         headers.extend(series.keys())
-        print '# ' + measure + " / " + variable
-        for header in headers:
-            print '"{label}"'.format(label=header),
-        print
+        result += '"m:{measure} v:{variable} g:{group}" {headers}\n'.format(measure=measure, variable=variable, group=group, headers=" ".join(['"{key}"'.format(key=key) for key in headers] ) )
+        # for header in headers:
+        #     print '"{label}"'.format(label=header),
+#        print
         var_value = None
         group_vals = []
         for idx in range(0, len(series.values()[0])):
@@ -125,35 +159,103 @@ def print_benchmarks(data, group, variable, measure):
             for grp in series.values():
                 if i == 0:
                     var_value = grp[idx][variable]
-                    print var_value, 
+                    result += '0 ' + str(var_value) + ' '
                 elif var_value != grp[idx][variable]:
                     print 'Error: groups have different variables'
                     exit(1)
                 i += 1
-                print grp[idx][measure],
-            print
+                result += str(grp[idx][measure]) + ' '
+            result += "\n"
+    return result
         
 if __name__ == '__main__':
-    if len(argv) != 5:
-        print "\nUsage: python plot_data.py filename group variable measure"
+    if len(argv) != 2:
+        print "\nUsage: python plot_data.py filename"
         exit(1)
 
     filename = argv[1]
-    group = argv[2]
-    variable = argv[3]
-    measure = argv[4]
+    # group = argv[2]
+    # variable = argv[3]
+    # measure = argv[4]
 
     f = open(filename)
     try:
-        benchmarks = read_datafile(f, variable)
+        benchmarks = read_datafile(f)
     finally:
         f.close()
 
-    data = extract_data(benchmarks, group, variable, measure)
-    
-#    pp.pprint(data)
+#direction
+#native_private
+#native_static
+#no
 
-    print_benchmarks(data, group, variable, measure)
+#parameter_count
+
+#parameter_type_count
+
+
+#parameter_type_boolean[]_count
+#parameter_type_boolean_count
+#parameter_type_byte[]_count
+#parameter_type_byte_count
+#parameter_type_char[]_count
+#parameter_type_char_count
+#parameter_type_double[]_count
+#parameter_type_double_count
+#parameter_type_float[]_count
+#parameter_type_float_count
+#parameter_type_int[]_count
+#parameter_type_int_count
+#parameter_type_java.lang.Class_count
+#parameter_type_java.lang.Object[]_count
+#parameter_type_java.lang.Object_count
+#parameter_type_java.lang.String_count
+#parameter_type_java.lang.Throwable_count
+#parameter_type_long[]_count
+#parameter_type_long_count
+#parameter_type_short[]_count
+#parameter_type_short_count
+
+#return_type
+
+#response_time_millis
+
+
+    print """
+set terminal postscript
+set output 'plot.ps'
+set key outside
+set xlabel "Number of parameters"
+set ylabel "Response time (ms)"
+"""
+#set size 0.6,0.6
+
+    group = 'direction'
+    for i, ptype in enumerate(types):
+
+        specs = {
+             'group'    : group,
+             'variable' : 'parameter_type_{t}_count'.format(t=ptype), 
+             'measure'  : 'response_time_millis'
+             }
+      
+        data = extract_data(benchmarks, **specs)
+        filename = "filename{num}.data".format(num=i)
+        plotdata = open(filename, "w")
+        plotdata.write(print_benchmarks(data, **specs))
+#set label 1 "foo weoigjew goijwegoe" at graph 1.1,0
+
+        print """
+set title '{title}'
+unset label 1
+plot for [I=3:6] '{filename}' using 2:I title columnhead with linespoints
+""".format(title=ptype, index=i, filename = filename )
+
+    # specs = {'group': 'single_type',
+    #          'measure': 'response_time_millis',
+    #          'variable': 'parameter_count',
+    #          'exclude': 'parameter_type_.+_count'}
+    
 
     exit(0)
 
