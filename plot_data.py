@@ -8,6 +8,43 @@ import pprint
 
 pp = pprint.PrettyPrinter(depth=10, indent=4)
 
+#direction
+#native_private
+#native_static
+#no
+
+#parameter_count
+
+#parameter_type_count
+
+
+#parameter_type_boolean[]_count
+#parameter_type_boolean_count
+#parameter_type_byte[]_count
+#parameter_type_byte_count
+#parameter_type_char[]_count
+#parameter_type_char_count
+#parameter_type_double[]_count
+#parameter_type_double_count
+#parameter_type_float[]_count
+#parameter_type_float_count
+#parameter_type_int[]_count
+#parameter_type_int_count
+#parameter_type_java.lang.Class_count
+#parameter_type_java.lang.Object[]_count
+#parameter_type_java.lang.Object_count
+#parameter_type_java.lang.String_count
+#parameter_type_java.lang.Throwable_count
+#parameter_type_long[]_count
+#parameter_type_long_count
+#parameter_type_short[]_count
+#parameter_type_short_count
+
+#return_type
+
+#response_time_millis
+
+
 types = [
         'boolean[]',
         'boolean',
@@ -144,28 +181,34 @@ def comp_function(keys, left, right):
 
 def print_benchmarks(data, group=None, variable=None, measure=None):
     result = ""
-    for series in data:
+    for k, series in enumerate(data):
         headers = []
         headers.append(variable)
         headers.extend(series.keys())
-        result += '"m:{measure} v:{variable} g:{group}" {headers}\n'.format(measure=measure, variable=variable, group=group, headers=" ".join(['"{key}"'.format(key=key) for key in headers] ) )
-        # for header in headers:
-        #     print '"{label}"'.format(label=header),
-#        print
+        result += '"m:{measure} v:{variable} g:{group}" {headers}\n'.format(
+            measure=measure,
+            variable=variable,
+            group=group, headers=" ".join(
+                ['"{key}"'.format(key=key) for key in headers]))
+
         var_value = None
         group_vals = []
         for idx in range(0, len(series.values()[0])):
             i = 0
-            for grp in series.values():
+            for key, grp in series.iteritems():
                 if i == 0:
                     var_value = grp[idx][variable]
-                    result += '0 ' + str(var_value) + ' '
+                    result += str(dict(grp[idx]['info'])['no']) + ' ' + str(var_value) + ' '
                 elif var_value != grp[idx][variable]:
                     print 'Error: groups have different variables'
+                    print 'expected', var_value, 'has', grp[idx][variable]
+                    print 'key', key, 'k', k, 'series keys', series.keys()
                     exit(1)
                 i += 1
                 result += str(grp[idx][measure]) + ' '
+
             result += "\n"
+        result += "\n\n"
     return result
         
 if __name__ == '__main__':
@@ -174,9 +217,6 @@ if __name__ == '__main__':
         exit(1)
 
     filename = argv[1]
-    # group = argv[2]
-    # variable = argv[3]
-    # measure = argv[4]
 
     f = open(filename)
     try:
@@ -184,51 +224,12 @@ if __name__ == '__main__':
     finally:
         f.close()
 
-#direction
-#native_private
-#native_static
-#no
-
-#parameter_count
-
-#parameter_type_count
-
-
-#parameter_type_boolean[]_count
-#parameter_type_boolean_count
-#parameter_type_byte[]_count
-#parameter_type_byte_count
-#parameter_type_char[]_count
-#parameter_type_char_count
-#parameter_type_double[]_count
-#parameter_type_double_count
-#parameter_type_float[]_count
-#parameter_type_float_count
-#parameter_type_int[]_count
-#parameter_type_int_count
-#parameter_type_java.lang.Class_count
-#parameter_type_java.lang.Object[]_count
-#parameter_type_java.lang.Object_count
-#parameter_type_java.lang.String_count
-#parameter_type_java.lang.Throwable_count
-#parameter_type_long[]_count
-#parameter_type_long_count
-#parameter_type_short[]_count
-#parameter_type_short_count
-
-#return_type
-
-#response_time_millis
-
-
-    print """
-set terminal postscript
-set output 'plot.ps'
-set key outside
-set xlabel "Number of parameters"
-set ylabel "Response time (ms)"
-"""
-#set size 0.6,0.6
+    print "set terminal pdfcairo size 32cm,18cm"
+    print "set output 'plot.pdf'"
+    print "set key outside"
+    print "set xlabel \"Number of parameters\""
+    print "set ylabel \"Response time (ms)\""
+    #print "set size 0.6,0.6"
 
     group = 'direction'
     for i, ptype in enumerate(types):
@@ -245,16 +246,32 @@ set ylabel "Response time (ms)"
         plotdata.write(print_benchmarks(data, **specs))
 #set label 1 "foo weoigjew goijwegoe" at graph 1.1,0
 
-        print """
-set title '{title}'
-unset label 1
-plot for [I=3:6] '{filename}' using 2:I title columnhead with linespoints
-""".format(title=ptype, index=i, filename = filename )
+        print ("set title '{title}'\n"
+               "unset label 1\n"
+               "plot for [I=3:6] '{filename}' using 2:I title columnhead with linespoints").format(
+            title=ptype, index=i, filename = filename )
 
-    # specs = {'group': 'single_type',
-    #          'measure': 'response_time_millis',
-    #          'variable': 'parameter_count',
-    #          'exclude': 'parameter_type_.+_count'}
+    filtered_benchmarks = benchmarks[:]
+    for bm in filtered_benchmarks:
+        for key in ["parameter_type_{t}_count".format(t=tp) for tp in types]:
+            del bm[key]
+
+    specs = {'group': 'single_type',
+             'measure': 'response_time_millis',
+             'variable': 'parameter_count'}
+
+    data = extract_data(filtered_benchmarks, **specs)
+    #pp.pprint(data)
+
+    filename = "filename_foo.data"
+    plotdata = open(filename, 'w')
+    plotdata.write(print_benchmarks(data, **specs))
+
+    for index in range(0,4):
+        print ("set title 'type grouping'\n"
+               "plot for [I=3:{limit}] 'filename_foo.data' index {index} using 2:I title columnhead with linespoints").format(
+            limit=3+len(types) -1, index=index)
+    
     
 
     exit(0)
