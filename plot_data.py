@@ -80,7 +80,7 @@ def value(string):
         return None
     if re_numerical.match(string):
         return int(string)
-    return string
+    return '"{s}"'.format(s=string)
 
 def add_derived_values(benchmark):
     if (benchmark['parameter_type_count'] == 1):
@@ -103,7 +103,7 @@ def read_datafile(f):
             
     return benchmarks
 
-def extract_data(benchmarks, group=None, variable=None, measure=None):
+def extract_data(benchmarks, group=None, variable=None, measure=None, min_series_length=2, min_series_width=2):
     series_collection = []
 
     focus = explode(group)
@@ -131,13 +131,8 @@ def extract_data(benchmarks, group=None, variable=None, measure=None):
     controlled_variables = filter(lambda x: not x in exclude_from_sorting, labels)
 
     for benchmark in sorted_benchmarks:
-        fixed_data = tuple()
-        for key in controlled_variables:
-            fixed_data += (key, benchmark[key]),
-
-        extra_data = tuple()
-        for key in additional_info:
-            extra_data += (key, benchmark[key]),
+        fixed_data = tuple((key, benchmark[key]) for key in controlled_variables)
+        extra_data = tuple((key, benchmark[key]) for key in additional_info)
 
         element = {
             'fixed'  : fixed_data,
@@ -155,7 +150,7 @@ def extract_data(benchmarks, group=None, variable=None, measure=None):
             if (series != None):
                 append = True
                 for bms in series.values():
-                    if len(bms) < 2:
+                    if len(bms) < min_series_length:
                         append = False
                 if append:
                     series_collection.append(series)
@@ -179,17 +174,19 @@ def comp_function(keys, left, right):
     return 0        
             
 
-def print_benchmarks(data, group=None, variable=None, measure=None):
+def print_benchmarks(data, group=None, variable=None, measure=None, min_groups=1):
     result = ""
     for k, series in enumerate(data):
+        if len(series.keys()) < min_groups:
+            continue
+
         headers = []
-        headers.append(variable)
+        headers.append('"{v}"'.format(v=variable))
         headers.extend(series.keys())
         result += '"m:{measure} v:{variable} g:{group}" {headers}\n'.format(
             measure=measure,
             variable=variable,
-            group=group, headers=" ".join(
-                ['"{key}"'.format(key=key) for key in headers]))
+            group=group, headers=" ".join(headers))
 
         var_value = None
         group_vals = []
@@ -197,7 +194,10 @@ def print_benchmarks(data, group=None, variable=None, measure=None):
             i = 0
             for key, grp in series.iteritems():
                 if i == 0:
-                    var_value = grp[idx][variable]
+                    try:
+                        var_value = grp[idx][variable]
+                    except KeyError as e:
+                        print variable
                     result += str(dict(grp[idx]['info'])['no']) + ' ' + str(var_value) + ' '
                 elif var_value != grp[idx][variable]:
                     print 'Error: groups have different variables'
@@ -241,7 +241,7 @@ if __name__ == '__main__':
              }
       
         data = extract_data(benchmarks, **specs)
-        filename = "filename{num}.data".format(num=i)
+        filename = "/tmp/plotdata_{num}.data".format(num=i)
         plotdata = open(filename, "w")
         plotdata.write(print_benchmarks(data, **specs))
 #set label 1 "foo weoigjew goijwegoe" at graph 1.1,0
@@ -256,23 +256,40 @@ if __name__ == '__main__':
         for key in ["parameter_type_{t}_count".format(t=tp) for tp in types]:
             del bm[key]
 
-    specs = {'group': 'single_type',
-             'measure': 'response_time_millis',
-             'variable': 'parameter_count'}
+    specs = { 'group'   : 'single_type',
+             'measure'  : 'response_time_millis',
+             'variable' : 'parameter_count'}
 
     data = extract_data(filtered_benchmarks, **specs)
     #pp.pprint(data)
 
-    filename = "filename_foo.data"
+    filename = "/tmp/plotdata_typegroups.data"
     plotdata = open(filename, 'w')
     plotdata.write(print_benchmarks(data, **specs))
 
     for index in range(0,4):
         print ("set title 'type grouping'\n"
-               "plot for [I=3:{limit}] 'filename_foo.data' index {index} using 2:I title columnhead with linespoints").format(
+               "plot for [I=3:{limit}] '/tmp/plotdata_typegroups.data' index {index} using 2:I title columnhead with linespoints").format(
             limit=3+len(types) -1, index=index)
-    
-    
+
+
+    specs = {
+        'group'    : 'return_type',
+        'measure'  : 'response_time_millis',
+        'variable' : 'direction'
+        }
+    data = extract_data(benchmarks, min_series_length=2, **specs)
+
+    #pp.pprint(data)
+
+    filename ="/tmp/plotdata_returntypes.data"
+    plotdata = open(filename, 'w')
+    plotdata.write(print_benchmarks(data, min_groups=2, **specs))
+
+    print ("set title 'return types'\n"
+           "unset label 1\n"
+           "plot for [I=3:{limit}] '{filename}' using I:xtic(2) title columnhead with linespoints").format(
+        limit=3+len(types)-1, filename = filename)
 
     exit(0)
 
