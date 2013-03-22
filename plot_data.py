@@ -83,7 +83,9 @@ def value(string):
     return '"{s}"'.format(s=string)
 
 def add_derived_values(benchmark):
-    if (benchmark['parameter_type_count'] == 1):
+    if (benchmark['parameter_type_count'] == 0):
+        single_type = 'empty'
+    elif (benchmark['parameter_type_count'] == 1):
         for tp in types:
             if benchmark['parameter_type_{t}_count'.format(t=tp)] != None:
                 single_type = tp
@@ -101,7 +103,7 @@ def read_datafile(f):
         add_derived_values(benchmark)
         benchmarks.append(benchmark)
             
-    return benchmarks
+    return sorted(benchmarks, key=lambda x: (x['no'], x['direction']))
 
 def extract_data(benchmarks, group=None, variable=None, measure=None, min_series_length=2, min_series_width=2):
     series_collection = []
@@ -114,6 +116,7 @@ def extract_data(benchmarks, group=None, variable=None, measure=None, min_series
     if re.match('parameter_type_.+count', variable):
         additional_info.append('parameter_count')
     additional_info.append('no')
+    additional_info.append('description')
 
     exclude_from_sorting = []
     exclude_from_sorting.extend(additional_info)
@@ -141,6 +144,7 @@ def extract_data(benchmarks, group=None, variable=None, measure=None, min_series
             measure  : benchmark[measure],
             group    : benchmark[group]}
 
+        
         if last_fixed == fixed_data:
             if (benchmark[group] not in series):
                 series[benchmark[group]] = []
@@ -190,6 +194,7 @@ def print_benchmarks(data, group=None, variable=None, measure=None, min_groups=1
 
         var_value = None
         group_vals = []
+
         for idx in range(0, len(series.values()[0])):
             i = 0
             for key, grp in series.iteritems():
@@ -241,9 +246,11 @@ if __name__ == '__main__':
              }
       
         data = extract_data(benchmarks, **specs)
+
         filename = "/tmp/plotdata_{num}.data".format(num=i)
         plotdata = open(filename, "w")
         plotdata.write(print_benchmarks(data, **specs))
+
 #set label 1 "foo weoigjew goijwegoe" at graph 1.1,0
 
         print ("set title '{title}'\n"
