@@ -5,17 +5,12 @@ import itertools
 import functools
 import re
 import pprint
+import os
+from copy import deepcopy
 
 pp = pprint.PrettyPrinter(depth=10, indent=4)
+debugdata = open('/tmp/debug.txt', 'w')
 
-#direction
-#native_private
-#native_static
-#no
-
-#parameter_count
-
-#parameter_type_count
 
 
 #parameter_type_boolean[]_count
@@ -77,17 +72,17 @@ def explode(line):
 
 def value(string):
     if string == '-':
-        return None
+        return 0
     if re_numerical.match(string):
         return int(string)
     return '"{s}"'.format(s=string)
 
 def add_derived_values(benchmark):
-    if (benchmark['parameter_type_count'] == 0):
-        single_type = 'empty'
+    if (benchmark['parameter_count'] == 0):
+        single_type = 'any'
     elif (benchmark['parameter_type_count'] == 1):
         for tp in types:
-            if benchmark['parameter_type_{t}_count'.format(t=tp)] != None:
+            if benchmark['parameter_type_{t}_count'.format(t=tp)] != 0:
                 single_type = tp
                 break
     else:
@@ -96,6 +91,7 @@ def add_derived_values(benchmark):
 
 def read_datafile(f):
     benchmarks = []
+    #-1: there is an empty field at the end...
     labels = explode(f.readline())[:-1]
     for line in f:
         benchmark = dict([(key,value(string)) for key, string in
@@ -103,14 +99,17 @@ def read_datafile(f):
         add_derived_values(benchmark)
         benchmarks.append(benchmark)
             
-    return sorted(benchmarks, key=lambda x: (x['no'], x['direction']))
+    return benchmarks
 
 def extract_data(benchmarks, group=None, variable=None, measure=None, min_series_length=2, min_series_width=2):
     series_collection = []
+    exclude_from_sorting = []
 
     focus = explode(group)
     focus.append(variable)
     focus.append(measure)
+
+    exclude_from_sorting.extend(focus)
 
     additional_info = []
     if re.match('parameter_type_.+count', variable):
@@ -118,9 +117,7 @@ def extract_data(benchmarks, group=None, variable=None, measure=None, min_series
     additional_info.append('no')
     additional_info.append('description')
 
-    exclude_from_sorting = []
     exclude_from_sorting.extend(additional_info)
-    exclude_from_sorting.extend(focus)
 
     labels = benchmarks[0].keys()
     sorted_keys = filter(lambda x: not x in exclude_from_sorting, labels)
@@ -128,6 +125,7 @@ def extract_data(benchmarks, group=None, variable=None, measure=None, min_series
 
     compare_function = functools.partial(comp_function, sorted_keys)
     sorted_benchmarks = sorted(benchmarks, cmp=compare_function)
+    #pp.pprint(sorted_benchmarks)
 
     last_fixed = None
     series = None
@@ -178,7 +176,12 @@ def comp_function(keys, left, right):
     return 0        
             
 
-def print_benchmarks(data, group=None, variable=None, measure=None, min_groups=1):
+def print_benchmarks(data, specs):
+    group = specs.get('group')
+    variable = specs.get('variable')
+    measure = specs.get('measure')
+    min_groups = specs.get('min_series_width', 1)
+
     result = ""
     for k, series in enumerate(data):
         if len(series.keys()) < min_groups:
@@ -215,13 +218,103 @@ def print_benchmarks(data, group=None, variable=None, measure=None, min_groups=1
             result += "\n"
         result += "\n\n"
     return result
+
+init_plots_gp = """
+set terminal pdfcairo size 32cm,18cm
+set output '{filename}'
+set key outside
+set xlabel "Number of parameters"
+set ylabel "Response time (ms)"
+"""
+#print "set size 0.6,0.6"
+#set label 1 "foo weoigjew goijwegoe" at graph 1.1,0
+
+plot_simple_groups = """
+set title '{title}'
+unset label 1
+plot for [I=3:{last_column}] '{filename}' index {index} using 2:I title columnhead with linespoints
+"""
+
+def plot_benchmarks(benchmarks, output, plotpath):
+    print init_plots_gp.format(filename=output)
+
+    for i, ptype in enumerate(types):
+        filename = os.path.join(plotpath, "plotdata_{num}.data".format(num=i))
+        filtered_benchmarks = filter(lambda x: (x['single_type'] in [ptype, 'any']), deepcopy(benchmarks))
+        for bm in filtered_benchmarks:
+            del bm['single_type']
+            del bm['parameter_type_count']
+            for key in ["parameter_type_{t}_count".format(t=tp) for tp in types]:
+                if key in bm:
+                    del bm[key]
         
+        # debugdata.write("\n")
+        # debugdata.write(pp.pformat(filtered_benchmarks))
+        # debugdata.write("\n")
+
+        write_plotdata(plotpath, filename, filtered_benchmarks, {
+             'group'    : 'direction',
+             'variable' : 'parameter_count', 
+             'measure'  : 'response_time_millis'
+             })
+        print(plot_simple_groups.format(
+            title = ptype, filename = filename, index = 0, last_column = 6))
+
+    filtered_benchmarks = deepcopy(benchmarks)
+    for bm in filtered_benchmarks:
+        for key in ["parameter_type_{t}_count".format(t=tp) for tp in types]:
+            del bm[key]
+
+    filename = os.path.join(plotpath, 'plotdata_typegroups.data')
+    data = write_plotdata(plotpath, filename, filtered_benchmarks, {
+        'group'    : 'single_type',
+        'measure'  : 'response_time_millis',
+        'variable' : 'parameter_count'})
+    debugdata.write(pp.pformat(data))
+
+    directions = []
+    for plot in data:
+        dirc = [val for key,val in (plot.values())[0][0]['fixed'] if key == 'direction']
+        if dirc != None:
+            directions.append(dirc[0])
+
+    for index in range(0,4):
+        print(plot_simple_groups.format(
+                title = 'type grouping ' + directions[index], filename = filename, index = index, last_column = len(types)+2))
+
+    filename = os.path.join(plotpath, 'plotdata_returntypes.data')
+    write_plotdata(plotpath, filename, benchmarks, {
+            'group'    : 'return_type',
+            'measure'  : 'response_time_millis',
+            'variable' : 'direction',
+            'min_series_width' : 2
+            })
+    print ("set title 'return types'\n"
+           "unset label 1\n"
+           "plot for [I=3:{limit}] '{filename}' using I:xtic(2) title columnhead with linespoints").format(
+        limit=len(types)+2, filename = filename)
+        
+def write_plotdata(path, filename, benchmarks, specs):
+    plotdata = open(filename, 'w')
+    data = extract_data(benchmarks, **specs)
+    # debugdata.write(pp.pformat(specs) + "\n\n")
+    # debugdata.write(pp.pformat(data))
+    plotdata.write(print_benchmarks(data, specs))
+    return data
+
+
 if __name__ == '__main__':
-    if len(argv) != 2:
-        print "\nUsage: python plot_data.py filename"
+    if len(argv) <  3 or len(argv) > 4:
+        print "\nUsage: python plot_data.py benchmarkdata outputfilename plotdatapath"
         exit(1)
 
     filename = argv[1]
+    output = argv[2]
+
+    if len(argv) == 4:
+        plotpath = argv[3]
+    else:
+        plotpath = '/tmp'
 
     f = open(filename)
     try:
@@ -229,76 +322,6 @@ if __name__ == '__main__':
     finally:
         f.close()
 
-    print "set terminal pdfcairo size 32cm,18cm"
-    print "set output 'plot.pdf'"
-    print "set key outside"
-    print "set xlabel \"Number of parameters\""
-    print "set ylabel \"Response time (ms)\""
-    #print "set size 0.6,0.6"
-
-    group = 'direction'
-    for i, ptype in enumerate(types):
-
-        specs = {
-             'group'    : group,
-             'variable' : 'parameter_type_{t}_count'.format(t=ptype), 
-             'measure'  : 'response_time_millis'
-             }
-      
-        data = extract_data(benchmarks, **specs)
-
-        filename = "/tmp/plotdata_{num}.data".format(num=i)
-        plotdata = open(filename, "w")
-        plotdata.write(print_benchmarks(data, **specs))
-
-#set label 1 "foo weoigjew goijwegoe" at graph 1.1,0
-
-        print ("set title '{title}'\n"
-               "unset label 1\n"
-               "plot for [I=3:6] '{filename}' using 2:I title columnhead with linespoints").format(
-            title=ptype, index=i, filename = filename )
-
-    filtered_benchmarks = benchmarks[:]
-    for bm in filtered_benchmarks:
-        for key in ["parameter_type_{t}_count".format(t=tp) for tp in types]:
-            del bm[key]
-
-    specs = { 'group'   : 'single_type',
-             'measure'  : 'response_time_millis',
-             'variable' : 'parameter_count'}
-
-    data = extract_data(filtered_benchmarks, **specs)
-    #pp.pprint(data)
-
-    filename = "/tmp/plotdata_typegroups.data"
-    plotdata = open(filename, 'w')
-    plotdata.write(print_benchmarks(data, **specs))
-
-    for index in range(0,4):
-        print ("set title 'type grouping'\n"
-               "plot for [I=3:{limit}] '/tmp/plotdata_typegroups.data' index {index} using 2:I title columnhead with linespoints").format(
-            limit=3+len(types) -1, index=index)
-
-
-    specs = {
-        'group'    : 'return_type',
-        'measure'  : 'response_time_millis',
-        'variable' : 'direction'
-        }
-    data = extract_data(benchmarks, min_series_length=2, **specs)
-
-    #pp.pprint(data)
-
-    filename ="/tmp/plotdata_returntypes.data"
-    plotdata = open(filename, 'w')
-    plotdata.write(print_benchmarks(data, min_groups=2, **specs))
-
-    print ("set title 'return types'\n"
-           "unset label 1\n"
-           "plot for [I=3:{limit}] '{filename}' using I:xtic(2) title columnhead with linespoints").format(
-        limit=3+len(types)-1, filename = filename)
-
+    plot_benchmarks(benchmarks, output, plotpath)
     exit(0)
-
-
     
