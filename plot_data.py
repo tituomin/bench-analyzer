@@ -331,21 +331,6 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
            "unset label 1\n"
            "plot for [I=3:{limit}] '{filename}' using I:xtic(2) title columnhead with linespoints".format(
         limit=len(types)+2, filename = filename))
-
-#     filename = os.path.join(plotpath, 'plotdata_distributions.data')    
-#     write_plotdata(plotpath, filename, benchmarks, {
-#             'group': 'direction',
-#             'variable' : 'index',
-#             'measure' : 'response_time_millis',
-#             'measure_count' : 1,
-#             'real_measure_count': 5})
-
-#     for index in range(0, 100):
-# """
-# binwidth=5
-# bin(x,width)=width*floor(x/width)
-# plot '{filename}' using (bin($3,binwidth)):(1.0) smooth freq with boxes
-# """.format(filename=filename)
         
 def write_plotdata(path, filename, benchmarks, specs):
     plotdata = open(filename, 'w')
