@@ -1,4 +1,4 @@
-i#!/usr/bin/python
+#!/usr/bin/python
 
 from sys import argv
 import itertools
@@ -74,13 +74,21 @@ def read_datafiles(files):
 
     for i, f in enumerate(files):
         line = f.readline()
+        lineno = 1
         while line != '':
-            benchmark = dict([(key,value(string)) for key, string in
-                              zip(labels, explode(line)[:-1])])
+            exploded_line = explode(line)[:-1]
+            if len(labels) != len(exploded_line):
+                print 'missing values', f.name, 'line', lineno, 'labels', len(labels), 'values', len(exploded_line)
+                exit(1)
+            benchmark = dict(
+                [(key,value(string)) for
+                 key, string in
+                 zip(labels, exploded_line)])
+
             add_derived_values(benchmark, i)
             benchmarks.append(benchmark)
             line = f.readline()
-            
+            lineno += 1
     return benchmarks
 
 def extract_data(benchmarks,
@@ -94,6 +102,8 @@ def extract_data(benchmarks,
     series_collection = []
     exclude_from_sorting = []
 
+    # additional data fields that should be excluded
+    # from all sorting / variable controlling
     additional_info = []
     if re.match('parameter_type_.+count', variable):
         additional_info.append('parameter_count')
@@ -102,6 +112,7 @@ def extract_data(benchmarks,
 
     exclude_from_sorting.extend(additional_info)
 
+    # the actual fields we're analyzing
     focus = explode(group)
     focus.append(variable)
     focus.append(measure)
@@ -123,8 +134,9 @@ def extract_data(benchmarks,
     values = []
     skip = False
 
-    if len(benchmarks) %  measure_count != 0:
-        print 'error not divisible by', measure_count
+    if len(benchmarks) % measure_count != 0:
+        print 'error not divisible by', measure_count, len(benchmarks)
+        exit(1)
 
     for i in range(0, len(benchmarks), measure_count):
         benchmarks_to_combine = sorted_benchmarks[i:i+measure_count]
@@ -203,16 +215,11 @@ def comp_function(keys, left, right):
     return 0        
             
 
-def print_benchmarks(data, specs):
-    group = specs.get('group')
-    variable = specs.get('variable')
-    measure = specs.get('measure')
-    min_groups = specs.get('min_series_width', 1)
-    sort = specs.get('sort', None)
-
+def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, min_series_width=None, measure_count=None):
     result = ""
     for k, series in enumerate(data):
-        if len(series.keys()) < min_groups:
+        if len(series.keys()) < min_series_width:
+            # there are not enough groups to display
             continue
 
         headers = []
@@ -335,9 +342,7 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
 def write_plotdata(path, filename, benchmarks, specs):
     plotdata = open(filename, 'w')
     data = extract_data(benchmarks, **specs)
-    # debugdata.write(pp.pformat(specs) + "\n\n")
-    #debugdata.write(pp.pformat(data))
-    plotdata.write(print_benchmarks(data, specs))
+    plotdata.write(print_benchmarks(data, **specs))
     return data
 
 
@@ -351,13 +356,16 @@ def read_measurement_metadata(mfile):
         while line == "\n":
             line = mfile.readline()
             skipped = True
+
         if skipped:
             if measurement:
-#                measurements.append(measurement)
+                if 'tools' in measurement:
+                    measurement['tool'] = measurement['tools']
                 checksum = measurement.get('code-checksum')
                 repetitions = measurement.get('repetitions')
+                tool = measurement.get('tool')
                 if checksum and repetitions:
-                        key = (checksum, repetitions)
+                        key = (checksum, repetitions, tool)
                         if key not in compatibles:
                             compatibles[key] = []
                         compatibles[key].append(measurement)
@@ -403,10 +411,12 @@ if __name__ == '__main__':
     [{idx}]:     total measurements: {num}
                     repetitions: {reps}
                        checksum: {ck}
+                           tool: {tool}
                           dates: {first} -
                                  {last}
     """.format(num=len(m), idx=i, reps=m[0].get('repetitions'),
                ck=m[0].get('code-checksum'),
+               tool=m[0].get('tool'),
                first=m[0]['start'], last=m[-1]['end'])
             i += 1
     
