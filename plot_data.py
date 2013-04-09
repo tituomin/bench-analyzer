@@ -8,6 +8,8 @@ import pprint
 import os
 from copy import deepcopy
 from collections import OrderedDict as odict
+from subprocess import call
+import shutil
 
 pp = pprint.PrettyPrinter(depth=10, indent=4)
 debugdata = open('/tmp/debug.txt', 'w')
@@ -382,19 +384,43 @@ def read_measurement_metadata(mfile):
 
     return compatibles
 
+MEASUREMENT_FILE = 'measurements.txt'
+MEASUREMENT_PATH = '/home/tituomin/Ubuntu One/gradu/measurements'
+DEVICE_PATH = '/sdcard/results'
+PLOTPATH = '/tmp'
+TOOL_NAMESPACE = 'fi.helsinki.cs.tituomin.nativebenchmark.measuringtool'
+
+def sync_measurements(dev_path, host_path, filename):
+    old_path = host_path + '/' + filename
+    tmp_path = '/tmp/' + filename
+    success = call(['adb', 'pull',
+                    dev_path  + '/' + filename,
+                    tmp_path])
+    if success == 0:
+        if os.path.exists(old_path):
+            size_new = os.path.getsize(tmp_path)
+            size_old = os.path.getsize(old_path)
+            if size_new < size_old:
+                print "Warning: new file contains less data than the old. Aborting."
+                exit(2)
+        shutil.move(tmp_path, old_path)
+
+    else:
+        print "Could not get new measurements, continuing with old."
+
 
 if __name__ == '__main__':
-    if len(argv) <  6 or len(argv) > 6:
-        print "\nUsage: python plot_data.py measurements_path pdfoutput gnuplotcommands plotdatapath limit"
+    if len(argv) <  4 or len(argv) > 4:
+        print "\n    Usage: python plot_data.py pdfoutput gnuplotcommands limit\n"
         exit(1)
 
-    measurement_path = argv[1]
-    output = argv[2]
-    gnuplotoutput = argv[3]
-    plotpath = argv[4]
-    limit = argv[5]
+    output = argv[1]
+    gnuplotoutput = argv[2]
+    limit = argv[3]
 
-    f = open(os.path.join(measurement_path, "measurements.txt"))
+    sync_measurements(DEVICE_PATH, MEASUREMENT_PATH, MEASUREMENT_FILE)
+
+    f = open(os.path.join(MEASUREMENT_PATH, MEASUREMENT_FILE))
 
     try:
         measurements = read_measurement_metadata(f)
@@ -418,15 +444,26 @@ if __name__ == '__main__':
                ck=m[0].get('code-checksum'),
                tool=m[0].get('tool'),
                first=m[0]['start'], last=m[-1]['end'])
+
             i += 1
     
     response = raw_input("Choose set 1-{last} >> ".format(last=i-1))
     benchmark_group = limited_measurements[int(response) - 1]
 
+    filenames = []
     files = []
     for measurement in benchmark_group:
-        files.append(open(os.path.join(measurement_path, "benchmarks-{n}.csv".format(
-                        n=measurement['id']))))
+        if measurement['tool'] == TOOL_NAMESPACE + '.LinuxPerfRecordTool':
+            basename = "perfdata-{n}.zip"
+            print 'tool is perf'
+        else:
+            basename = "benchmarks-{n}.csv"
+            print 'tool is recorder'
+        filenames.append(
+            basename.format(n=measurement['id']))
+
+    for filename in filenames:
+        sync_measurements(DEVICE_PATH, MEASUREMENT_PATH, filename)
     try:
         benchmarks = read_datafiles(files)
     finally:
