@@ -14,28 +14,35 @@ import shutil
 pp = pprint.PrettyPrinter(depth=10, indent=4)
 debugdata = open('/tmp/debug.txt', 'w')
 
-types = [
+reference_types = [
         'boolean[]',
-        'boolean',
         'byte[]',
-        'byte',
         'char[]',
-        'char',
         'double[]',
-        'double',
         'float[]',
-        'float',
         'int[]',
-        'int',
         'long[]',
-        'long',
         'short[]',
-        'short',
-        'java.lang.Class',
         'java.lang.Object[]',
+        'java.lang.Class',
         'java.lang.Object',
         'java.lang.String',
-        'java.lang.Throwable']
+        'java.lang.Throwable'
+    ]
+
+primitive_types = [
+        'boolean',
+        'byte',
+        'char',
+        'double',
+        'float',
+        'int',
+        'long',
+        'short'
+]
+
+types = reference_types[:]
+types.extend(primitive_types)
 
 SEPARATOR = ','
 NUMERICAL = '[0-9]+'
@@ -53,6 +60,8 @@ def value(string):
         return '"{s}"'.format(s=string)
 
 def add_derived_values(benchmark, index):
+    print 'called add'
+    single_type = None
     if (benchmark['parameter_count'] == 0):
         single_type = 'any'
     elif (benchmark['parameter_type_count'] == 1):
@@ -60,12 +69,12 @@ def add_derived_values(benchmark, index):
             if benchmark['parameter_type_{t}_count'.format(t=tp)] != 0:
                 single_type = tp
                 break
-    else:
-        single_type = None
     benchmark['single_type'] = single_type
+    print 'added single_type'
     benchmark['index'] = index
 
 def read_datafiles(files):
+    print 'Reading from %s files' % len(files)
     benchmarks = []
     #-1: there is an empty field at the end...
 
@@ -91,6 +100,7 @@ def read_datafiles(files):
             benchmarks.append(benchmark)
             line = f.readline()
             lineno += 1
+    print 'Read %d lines' % (lineno - 1)
     return benchmarks
 
 def extract_data(benchmarks,
@@ -111,6 +121,7 @@ def extract_data(benchmarks,
         additional_info.append('parameter_count')
     additional_info.append('no')
     additional_info.append('description')
+    additional_info.append('class')
 
     exclude_from_sorting.extend(additional_info)
 
@@ -245,7 +256,7 @@ def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, m
                         print variable
                     result += str(dict(grp[idx]['info'])['no']) + ' ' + str(var_value) + ' '
                 elif var_value != grp[idx][variable]:
-                    debugdata.write(pp.pformat(series))
+#                    debugdata.write(pp.pformat(series))
                     print 'Error: groups have different variables'
                     print 'expected', var_value, 'has', grp[idx][variable]
                     print 'key', key, 'k', k, 'series keys', series.keys()
@@ -273,21 +284,24 @@ unset label 1
 plot for [I=3:{last_column}] '{filename}' index {index} using 2:I title columnhead with linespoints
 """
 
+def remove_keys(d, keys):
+    for key in keys:
+        del d[key]
+    return d
+
 def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count=None):
     f = open(gnuplotcommands, 'w')
 
     f.write(init_plots_gp.format(filename=output))
 
+    type_counts = ["parameter_type_{t}_count".format(t=tp) for tp in types]
+    keys_to_remove = type_counts[:]
+    keys_to_remove.extend(['parameter_type_count'])
+
     for i, ptype in enumerate(types):
         filename = os.path.join(plotpath, "plotdata_{num}.data".format(num=i))
-        filtered_benchmarks = filter(lambda x: (x['single_type'] in [ptype, 'any']), deepcopy(benchmarks))
-        for bm in filtered_benchmarks:
-            del bm['single_type']
-            del bm['parameter_type_count']
-            for key in ["parameter_type_{t}_count".format(t=tp) for tp in types]:
-                if key in bm:
-                    del bm[key]
-        
+        filtered_benchmarks = [remove_keys(x, keys_to_remove) for x in benchmarks if x['single_type'] in [ptype, 'any']]
+        filtered_benchmarks = [remove_keys(x, ['single_type']) for x in filtered_benchmarks]
         # debugdata.write("\n")
         # debugdata.write(pp.pformat(filtered_benchmarks))
         # debugdata.write("\n")
@@ -302,8 +316,33 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
         f.write(plot_simple_groups.format(
             title = ptype, filename = filename, index = 0, last_column = 6))
 
+    filtered_benchmarks = [remove_keys(x, type_counts) for x in benchmarks if x['has_reference_types'] == 1]
+    filename = os.path.join(plotpath, 'plotdata_dynamic_size.data')
+    data = write_plotdata(plotpath, filename, filtered_benchmarks, {
+            'group'  : 'single_type',
+            'variable' : 'dynamic_size',
+            'measure' : 'response_time_millis',
+            'measure_count' : measure_count
+            })
+
+    f.write(plot_simple_groups.format(
+                title = 'Dynamic size: parameters', filename=filename, index=0, last_column=len(reference_types)+2))
+
+    filtered_benchmarks = [remove_keys(x, type_counts) for x in benchmarks if x['has_reference_types'] == 1]
+    filename = os.path.join(plotpath, 'plotdata_dynamic_size_ret.data')
+    data = write_plotdata(plotpath, filename, filtered_benchmarks, {
+            'group'  : 'return_type',
+            'variable' : 'dynamic_size',
+            'measure' : 'response_time_millis',
+            'measure_count' : measure_count
+            })
+
+    f.write(plot_simple_groups.format(
+                title = 'Dynamic size: return types', filename=filename, index=0, last_column=len(reference_types)+2))
+
     filtered_benchmarks = deepcopy(benchmarks)
     for bm in filtered_benchmarks:
+        del bm['has_reference_types']
         for key in ["parameter_type_{t}_count".format(t=tp) for tp in types]:
             del bm[key]
 
@@ -322,10 +361,18 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
             directions.append(dirc[0])
 
     for index in range(0,4):
-        f.write(plot_simple_groups.format(
+        f.write(
+            plot_simple_groups.format(
                 title = 'type grouping ' + directions[index], filename = filename, index = index, last_column = len(types)+2))
 
     filtered_benchmarks = filter(lambda x: x['return_type'] != '"void"', deepcopy(benchmarks))
+
+    # todo: doesn't work yet
+
+    for bm in filtered_benchmarks:
+        del bm['has_reference_types']
+
+    filtered_benchmarks = [x for x in filtered_benchmarks if x['dynamic_size'] == 0]
     filename = os.path.join(plotpath, 'plotdata_returntypes.data')
     write_plotdata(plotpath, filename, filtered_benchmarks, {
             'group'    : 'return_type',
@@ -340,10 +387,14 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
            "unset label 1\n"
            "plot for [I=3:{limit}] '{filename}' using I:xtic(2) title columnhead with linespoints".format(
         limit=len(types)+2, filename = filename))
+
+
+    
         
 def write_plotdata(path, filename, benchmarks, specs):
     plotdata = open(filename, 'w')
     data = extract_data(benchmarks, **specs)
+#    debugdata.write(pp.pformat(data))    
     plotdata.write(print_benchmarks(data, **specs))
     return data
 
@@ -366,8 +417,9 @@ def read_measurement_metadata(mfile):
                 checksum = measurement.get('code-checksum')
                 repetitions = measurement.get('repetitions')
                 tool = measurement.get('tool')
+                cpufreq = measurement.get('cpu-freq')
                 if checksum and repetitions:
-                        key = (checksum, repetitions, tool)
+                        key = (checksum, repetitions, tool, cpufreq)
                         if key not in compatibles:
                             compatibles[key] = []
                         compatibles[key].append(measurement)
@@ -390,9 +442,13 @@ DEVICE_PATH = '/sdcard/results'
 PLOTPATH = '/tmp'
 TOOL_NAMESPACE = 'fi.helsinki.cs.tituomin.nativebenchmark.measuringtool'
 
-def sync_measurements(dev_path, host_path, filename):
+def sync_measurements(dev_path, host_path, filename, update=True):
     old_path = host_path + '/' + filename
     tmp_path = '/tmp/' + filename
+    if not update and os.path.exists(old_path):
+        print 'No sync necessary'
+        return
+
     success = call(['adb', 'pull',
                     dev_path  + '/' + filename,
                     tmp_path])
@@ -451,19 +507,18 @@ if __name__ == '__main__':
     benchmark_group = limited_measurements[int(response) - 1]
 
     filenames = []
-    files = []
     for measurement in benchmark_group:
         if measurement['tool'] == TOOL_NAMESPACE + '.LinuxPerfRecordTool':
             basename = "perfdata-{n}.zip"
-            print 'tool is perf'
         else:
             basename = "benchmarks-{n}.csv"
-            print 'tool is recorder'
         filenames.append(
             basename.format(n=measurement['id']))
 
+    files = []
     for filename in filenames:
-        sync_measurements(DEVICE_PATH, MEASUREMENT_PATH, filename)
+        sync_measurements(DEVICE_PATH, MEASUREMENT_PATH, filename, update=False)
+        files.append(open(os.path.join(MEASUREMENT_PATH, filename)))
     try:
         benchmarks = read_datafiles(files)
     finally:
@@ -473,6 +528,6 @@ if __name__ == '__main__':
 #    pp.pprint(benchmarks)
 
     measure_count = len(benchmark_group)
-    plot_benchmarks(benchmarks, output, plotpath, gnuplotoutput, measure_count=measure_count)
+    plot_benchmarks(benchmarks, output, PLOTPATH, gnuplotoutput, measure_count=measure_count)
     exit(0)
     
