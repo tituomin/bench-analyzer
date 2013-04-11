@@ -60,7 +60,6 @@ def value(string):
         return '"{s}"'.format(s=string)
 
 def add_derived_values(benchmark, index):
-    print 'called add'
     single_type = None
     if (benchmark['parameter_count'] == 0):
         single_type = 'any'
@@ -70,7 +69,6 @@ def add_derived_values(benchmark, index):
                 single_type = tp
                 break
     benchmark['single_type'] = single_type
-    print 'added single_type'
     benchmark['index'] = index
 
 def read_datafiles(files):
@@ -91,7 +89,8 @@ def read_datafiles(files):
             if len(labels) != len(exploded_line):
                 print 'missing values', f.name, 'line', lineno, 'labels', len(labels), 'values', len(exploded_line)
                 exit(1)
-            benchmark = dict(
+
+            benchmark = odict(
                 [(key,value(string)) for
                  key, string in
                  zip(labels, exploded_line)])
@@ -105,59 +104,45 @@ def read_datafiles(files):
 
 def extract_data(benchmarks,
                  group=None, variable=None, measure=None,
-                 min_series_length=2, min_series_width=2, sort=None, measure_count=None, real_measure_count=None):
+                 min_series_length=2, min_series_width=2, sort=None, measure_count=None):
 
     if variable != 'index':
         for bm in benchmarks:
             del bm['index']
         
-    series_collection = []
-    exclude_from_sorting = []
-
-    # additional data fields that should be excluded
     # from all sorting / variable controlling
     additional_info = []
     if re.match('parameter_type_.+count', variable):
         additional_info.append('parameter_count')
-    additional_info.append('no')
-    additional_info.append('description')
-    additional_info.append('class')
-
-    exclude_from_sorting.extend(additional_info)
+    additional_info.extend(['no', 'description', 'class'])
 
     # the actual fields we're analyzing
     focus = explode(group)
     focus.append(variable)
     focus.append(measure)
 
+    exclude_from_sorting = []
+    exclude_from_sorting.extend(additional_info)
     exclude_from_sorting.extend(focus)
 
-    labels = benchmarks[0].keys()
-    sorted_keys = filter(lambda x: not x in exclude_from_sorting, labels)
+    controlled_variables = [x for x in benchmarks[0].keys() if x not in exclude_from_sorting]
+    sorted_keys = controlled_variables[:]
     sorted_keys.extend(exclude_from_sorting)
 
     compare_function = functools.partial(comp_function, sorted_keys)
     sorted_benchmarks = sorted(benchmarks, cmp=compare_function)
 
-    last_fixed = None
-    series = None
-    controlled_variables = filter(lambda x: not x in exclude_from_sorting, labels)
-
-    benchmark = None
-    values = []
-    skip = False
-
     if len(benchmarks) % measure_count != 0:
         print 'error not divisible by', measure_count, len(benchmarks)
         exit(1)
 
+    groups = {}
     for i in range(0, len(benchmarks), measure_count):
         benchmarks_to_combine = sorted_benchmarks[i:i+measure_count]
-        values = []
+        values = [bm[measure] for bm in benchmarks_to_combine]
+
         last_bm = None
         for bm in benchmarks_to_combine:
-            values.append(bm[measure])
-
             if last_bm != None:
                 for key in filter(lambda x: x != measure, bm.keys()):
                     if last_bm[key] != bm[key]:
@@ -166,7 +151,7 @@ def extract_data(benchmarks,
 
         # take measure_count measurements, combine
         benchmark = benchmarks_to_combine[0]
-        benchmark[measure] = mean(values) # todo: parametrize combining function
+        benchmark[measure] = min(values) # todo: parametrize combining function
 
         fixed_data = tuple((key, benchmark[key]) for key in controlled_variables)
         extra_data = tuple((key, benchmark[key]) for key in additional_info)
@@ -177,25 +162,18 @@ def extract_data(benchmarks,
             variable : benchmark[variable],
             measure  : benchmark[measure],
             group    : benchmark[group]}
-        
-        if last_fixed == fixed_data:
-            if (benchmark[group] not in series):
-                series[benchmark[group]] = []
-            series[benchmark[group]].append(element)
 
-        else:
-            if (series != None):
-                append = True
-                for bms in series.values():
-                    if len(bms) < min_series_length:
-                        append = False
-                if append:
-                    series_collection.append(series)
-            series = {benchmark[group]: [element]}
+        my_group = groups.setdefault(fixed_data, [])
+        my_group.append(element)
 
-        last_fixed = fixed_data
+    series_collection = []
+    for el_list in groups.values():
+        series = {}
+        for el in el_list:
+            series.setdefault(el[group], []).append(el)
+        series_collection.append(series)
 
-    return series_collection
+    return [x for x in series_collection if len((x.values())[0]) >= min_series_length]
 
 
 def mean(values):
@@ -245,10 +223,16 @@ def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, m
 
         var_value = None
         group_vals = []
-
+        last_grp = series.values()[0]
         for idx in range(0, len(series.values()[0])):
             i = 0
             for key, grp in series.iteritems():
+                if len(last_grp) != len(grp):
+                    print 'error different lenght groups'
+                    print last_grp
+                    print grp
+                    exit(1)
+                
                 if i == 0:
                     try:
                         var_value = grp[idx][variable]
@@ -263,6 +247,7 @@ def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, m
                     exit(1)
                 i += 1
                 result += str(grp[idx][measure]) + ' '
+                last_grp = grp
 
             result += "\n"
         result += "\n\n"
@@ -285,9 +270,11 @@ plot for [I=3:{last_column}] '{filename}' index {index} using 2:I title columnhe
 """
 
 def remove_keys(d, keys):
-    for key in keys:
-        del d[key]
-    return d
+    dnew = odict()
+    for key, val in d.iteritems():
+        if key not in  keys:
+            dnew[key] = val
+    return dnew
 
 def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count=None):
     f = open(gnuplotcommands, 'w')
@@ -296,15 +283,14 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
 
     type_counts = ["parameter_type_{t}_count".format(t=tp) for tp in types]
     keys_to_remove = type_counts[:]
-    keys_to_remove.extend(['parameter_type_count'])
+    keys_to_remove.extend(['parameter_type_count', 'single_type'])
 
+    print 'All types'
     for i, ptype in enumerate(types):
         filename = os.path.join(plotpath, "plotdata_{num}.data".format(num=i))
-        filtered_benchmarks = [remove_keys(x, keys_to_remove) for x in benchmarks if x['single_type'] in [ptype, 'any']]
-        filtered_benchmarks = [remove_keys(x, ['single_type']) for x in filtered_benchmarks]
-        # debugdata.write("\n")
-        # debugdata.write(pp.pformat(filtered_benchmarks))
-        # debugdata.write("\n")
+        filtered_benchmarks = [remove_keys(x, keys_to_remove)
+                               for x in benchmarks
+                               if x['single_type'] in [ptype, 'any']]
 
         write_plotdata(plotpath, filename, filtered_benchmarks, {
              'group'    : 'direction',
@@ -314,9 +300,14 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
              
              })
         f.write(plot_simple_groups.format(
-            title = ptype, filename = filename, index = 0, last_column = 6))
+           title = ptype, filename = filename, index = 0, last_column = 6))
 
-    filtered_benchmarks = [remove_keys(x, type_counts) for x in benchmarks if x['has_reference_types'] == 1]
+    filtered_benchmarks = [remove_keys(x, type_counts)
+                           for x in benchmarks
+                           if x['has_reference_types'] == 1
+                           and x['single_type'] in ["%s" % t for t in reference_types]
+                           and x['parameter_count'] == 1]
+
     filename = os.path.join(plotpath, 'plotdata_dynamic_size.data')
     data = write_plotdata(plotpath, filename, filtered_benchmarks, {
             'group'  : 'single_type',
@@ -325,10 +316,16 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
             'measure_count' : measure_count
             })
 
+    debugdata.write(pp.pformat(data))
+
     f.write(plot_simple_groups.format(
                 title = 'Dynamic size: parameters', filename=filename, index=0, last_column=len(reference_types)+2))
 
-    filtered_benchmarks = [remove_keys(x, type_counts) for x in benchmarks if x['has_reference_types'] == 1]
+    filtered_benchmarks = [remove_keys(x, type_counts)
+                           for x in benchmarks
+                           if x['has_reference_types'] == 1
+                           and x['return_type'] != '"void"']
+
     filename = os.path.join(plotpath, 'plotdata_dynamic_size_ret.data')
     data = write_plotdata(plotpath, filename, filtered_benchmarks, {
             'group'  : 'return_type',
@@ -340,11 +337,9 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
     f.write(plot_simple_groups.format(
                 title = 'Dynamic size: return types', filename=filename, index=0, last_column=len(reference_types)+2))
 
-    filtered_benchmarks = deepcopy(benchmarks)
-    for bm in filtered_benchmarks:
-        del bm['has_reference_types']
-        for key in ["parameter_type_{t}_count".format(t=tp) for tp in types]:
-            del bm[key]
+    keys_to_remove = type_counts[:]
+    keys_to_remove.append('has_reference_types')
+    filtered_benchmarks = [remove_keys(x, keys_to_remove) for x in benchmarks]
 
     filename = os.path.join(plotpath, 'plotdata_typegroups.data')
     data = write_plotdata(plotpath, filename, filtered_benchmarks, {
@@ -352,8 +347,8 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
         'measure'  : 'response_time_millis',
         'variable' : 'parameter_count',
         'measure_count' : measure_count})
-#    debugdata.write(pp.pformat(data))
 
+    # todo same for above
     directions = []
     for plot in data:
         dirc = [val for key,val in (plot.values())[0][0]['fixed'] if key == 'direction']
@@ -365,14 +360,8 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
             plot_simple_groups.format(
                 title = 'type grouping ' + directions[index], filename = filename, index = index, last_column = len(types)+2))
 
-    filtered_benchmarks = filter(lambda x: x['return_type'] != '"void"', deepcopy(benchmarks))
+    filtered_benchmarks = [remove_keys(x, ['has_reference_types']) for x in benchmarks if x['dynamic_size'] == 0 and x['return_type'] != '"void"']
 
-    # todo: doesn't work yet
-
-    for bm in filtered_benchmarks:
-        del bm['has_reference_types']
-
-    filtered_benchmarks = [x for x in filtered_benchmarks if x['dynamic_size'] == 0]
     filename = os.path.join(plotpath, 'plotdata_returntypes.data')
     write_plotdata(plotpath, filename, filtered_benchmarks, {
             'group'    : 'return_type',
@@ -387,14 +376,12 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
            "unset label 1\n"
            "plot for [I=3:{limit}] '{filename}' using I:xtic(2) title columnhead with linespoints".format(
         limit=len(types)+2, filename = filename))
-
-
     
         
 def write_plotdata(path, filename, benchmarks, specs):
     plotdata = open(filename, 'w')
     data = extract_data(benchmarks, **specs)
-#    debugdata.write(pp.pformat(data))    
+    # debugdata.write(pp.pformat(data))    
     plotdata.write(print_benchmarks(data, **specs))
     return data
 
