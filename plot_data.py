@@ -10,6 +10,7 @@ from copy import deepcopy
 from collections import OrderedDict as odict
 from subprocess import call
 import shutil
+import uuid
 
 pp = pprint.PrettyPrinter(depth=10, indent=4)
 debugdata = open('/tmp/debug.txt', 'w')
@@ -41,6 +42,11 @@ primitive_types = [
         'short'
 ]
 
+directions = []
+for from_lang, to_lang in [('J', 'C'), ('J', 'J'), ('C','C'), ('C', 'J')]:
+    directions.append("%s > %s" % (from_lang, to_lang))
+
+
 types = reference_types[:]
 types.extend(primitive_types)
 
@@ -57,7 +63,7 @@ def value(string):
     if re_numerical.match(string):
         return int(string)
     else:
-        return '"{s}"'.format(s=string)
+        return string
 
 def add_derived_values(benchmark, index):
     single_type = None
@@ -104,7 +110,7 @@ def read_datafiles(files):
 
 def extract_data(benchmarks,
                  group=None, variable=None, measure=None,
-                 min_series_length=2, min_series_width=2, sort=None, measure_count=None):
+                 min_series_length=2, sort=None, measure_count=None, min_series_width=None):
 
     if variable != 'index':
         for bm in benchmarks:
@@ -136,7 +142,7 @@ def extract_data(benchmarks,
         print 'error not divisible by', measure_count, len(benchmarks)
         exit(1)
 
-    groups = {}
+    groups = odict()
     for i in range(0, len(benchmarks), measure_count):
         benchmarks_to_combine = sorted_benchmarks[i:i+measure_count]
         values = [bm[measure] for bm in benchmarks_to_combine]
@@ -168,7 +174,7 @@ def extract_data(benchmarks,
 
     series_collection = []
     for el_list in groups.values():
-        series = {}
+        series = odict()
         for el in el_list:
             series.setdefault(el[group], []).append(el)
         series_collection.append(series)
@@ -186,10 +192,10 @@ def comp_function(keys, left, right):
             return 0
         l, r = left[key], right[key]
         ordering = {
-            '"C > C"' : 0,
-            '"J > C"' : 1,
-            '"J > J"' : 2,
-            '"C > J"' : 3
+            'C > C' : 0,
+            'J > C' : 1,
+            'J > J' : 2,
+            'C > J' : 3
             }
 
         if l in ordering.keys() and r in ordering.keys():
@@ -238,15 +244,23 @@ def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, m
                         var_value = grp[idx][variable]
                     except KeyError as e:
                         print variable
-                    result += str(dict(grp[idx]['info'])['no']) + ' ' + str(var_value) + ' '
-                elif var_value != grp[idx][variable]:
+                    if type(var_value) == str:
+                        real_value = '"{0}"'.format(var_value)
+                    else:
+                        real_value = var_value
+                    result += str(dict(grp[idx]['info'])['no']) + ' ' + str(real_value) + ' '
+                else:
+                    if var_value != grp[idx][variable]:
 #                    debugdata.write(pp.pformat(series))
-                    print 'Error: groups have different variables'
-                    print 'expected', var_value, 'has', grp[idx][variable]
-                    print 'key', key, 'k', k, 'series keys', series.keys()
-                    exit(1)
+                        print 'Error: groups have different variables'
+                        print 'expected', var_value, 'has', grp[idx][variable]
+                        print 'key', key, 'k', k, 'series keys', series.keys()
+                        exit(1)
                 i += 1
-                result += str(grp[idx][measure]) + ' '
+                val = grp[idx][measure]
+                if type(val) == str:
+                    val = '"{0}"'.format(val)
+                result += str(val) + ' '
                 last_grp = grp
 
             result += "\n"
@@ -260,8 +274,6 @@ set key outside
 set xlabel "Number of parameters"
 set ylabel "Response time (ms)"
 """
-#print "set size 0.6,0.6"
-#set label 1 "foo weoigjew goijwegoe" at graph 1.1,0
 
 plot_simple_groups = """
 set title '{title}'
@@ -269,113 +281,139 @@ unset label 1
 plot for [I=3:{last_column}] '{filename}' index {index} using 2:I title columnhead with linespoints
 """
 
-def remove_keys(d, keys):
+plot_named_columns = """
+set title '{title}'
+unset label 1
+plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title columnhead with linespoints
+"""
+
+def without(keys, d):
     dnew = odict()
     for key, val in d.iteritems():
         if key not in  keys:
             dnew[key] = val
     return dnew
 
+def plot(
+    benchmarks, gnuplot_script, plotpath, keys_to_remove=None, select_predicate=None,
+    group=None, variable=None, measure=None, measure_count=None, title=None, num_groups=None,
+    template=None, min_series_width=1):
+
+    filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
+    filtered_benchmarks = [
+        without(keys_to_remove, x)
+        for x in benchmarks
+        if select_predicate(x)]
+
+    data = write_plotdata(plotpath, filename, filtered_benchmarks, {
+         'group'         : group,
+         'variable'      : variable, 
+         'measure'       : measure,
+         'measure_count' : measure_count,
+         'min_series_width' : min_series_width})
+
+    gnuplot_script.write(template.format(
+       title = title, filename = filename, index = 0, last_column = 2 + num_groups))
+
+def get_fixed_value(element, key):
+    for k, v in element['fixed']:
+        if k == key:
+            return v
+    return None
+
+def all_values(data, key):
+    directions = []
+    return [get_fixed_value(plot.values()[0][0], key) for plot in data]
+
 def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count=None):
     f = open(gnuplotcommands, 'w')
-
     f.write(init_plots_gp.format(filename=output))
 
     type_counts = ["parameter_type_{t}_count".format(t=tp) for tp in types]
     keys_to_remove = type_counts[:]
     keys_to_remove.extend(['parameter_type_count', 'single_type'])
 
-    print 'All types'
     for i, ptype in enumerate(types):
-        filename = os.path.join(plotpath, "plotdata_{num}.data".format(num=i))
-        filtered_benchmarks = [remove_keys(x, keys_to_remove)
-                               for x in benchmarks
-                               if x['single_type'] in [ptype, 'any']]
+        plot(
+            benchmarks, f, plotpath,
+            title = ptype,
+            template = plot_simple_groups,
+            keys_to_remove = keys_to_remove,
+            select_predicate = lambda x: x['single_type'] in [ptype, 'any'],
+            group = 'direction',
+            variable = 'parameter_count',
+            measure = 'response_time_millis',
+            measure_count = measure_count,
+            num_groups = 4)
 
-        write_plotdata(plotpath, filename, filtered_benchmarks, {
-             'group'    : 'direction',
-             'variable' : 'parameter_count', 
-             'measure'  : 'response_time_millis',
-             'measure_count' : measure_count
-             
-             })
-        f.write(plot_simple_groups.format(
-           title = ptype, filename = filename, index = 0, last_column = 6))
+    for direction in directions:
+        plot(
+            benchmarks, f, plotpath,
+            title = 'Dynamic size: parameters, direction ' + direction,
+            template = plot_simple_groups,
+            keys_to_remove = type_counts,
+            select_predicate = (
+                lambda x: (
+                    x['direction'] == direction and
+                    x['has_reference_types'] == 1 and
+                    x['single_type'] in [t for t in reference_types] and
+                    x['parameter_count'] == 1)),
+            group = 'single_type',
+            variable = 'dynamic_size',
+            measure = 'response_time_millis',
+            measure_count = measure_count,
+            num_groups = len(reference_types))
 
-    filtered_benchmarks = [remove_keys(x, type_counts)
-                           for x in benchmarks
-                           if x['has_reference_types'] == 1
-                           and x['single_type'] in ["%s" % t for t in reference_types]
-                           and x['parameter_count'] == 1]
+    for direction in directions:
+        plot(
+            benchmarks, f, plotpath,
+            title = 'Dynamic size: return types, direction ' + direction,
+            template = plot_simple_groups,
+            keys_to_remove = type_counts,
+            select_predicate = (
+                lambda x: x['has_reference_types'] == 1
+                and x['direction'] == direction 
+                and x['return_type'] != 'void'),
+            group = 'return_type',
+            variable = 'dynamic_size',
+            measure = 'response_time_millis',
+            measure_count = measure_count,
+            num_groups = len(reference_types))
 
-    filename = os.path.join(plotpath, 'plotdata_dynamic_size.data')
-    data = write_plotdata(plotpath, filename, filtered_benchmarks, {
-            'group'  : 'single_type',
-            'variable' : 'dynamic_size',
-            'measure' : 'response_time_millis',
-            'measure_count' : measure_count
-            })
-
-    debugdata.write(pp.pformat(data))
-
-    f.write(plot_simple_groups.format(
-                title = 'Dynamic size: parameters', filename=filename, index=0, last_column=len(reference_types)+2))
-
-    filtered_benchmarks = [remove_keys(x, type_counts)
-                           for x in benchmarks
-                           if x['has_reference_types'] == 1
-                           and x['return_type'] != '"void"']
-
-    filename = os.path.join(plotpath, 'plotdata_dynamic_size_ret.data')
-    data = write_plotdata(plotpath, filename, filtered_benchmarks, {
-            'group'  : 'return_type',
-            'variable' : 'dynamic_size',
-            'measure' : 'response_time_millis',
-            'measure_count' : measure_count
-            })
-
-    f.write(plot_simple_groups.format(
-                title = 'Dynamic size: return types', filename=filename, index=0, last_column=len(reference_types)+2))
 
     keys_to_remove = type_counts[:]
     keys_to_remove.append('has_reference_types')
-    filtered_benchmarks = [remove_keys(x, keys_to_remove) for x in benchmarks]
 
-    filename = os.path.join(plotpath, 'plotdata_typegroups.data')
-    data = write_plotdata(plotpath, filename, filtered_benchmarks, {
-        'group'    : 'single_type',
-        'measure'  : 'response_time_millis',
-        'variable' : 'parameter_count',
-        'measure_count' : measure_count})
+    for direction in directions:
+        plot(
+            benchmarks, f, plotpath,
+            template = plot_simple_groups,
+            title = 'type grouping ' + direction,
+            keys_to_remove = keys_to_remove,
+            select_predicate = (
+                lambda x: x['direction'] == direction),
+            group = 'single_type',
+            variable = 'parameter_count',
+            measure = 'response_time_millis',
+            measure_count = measure_count,
+            num_groups = len(types))
+    
 
-    # todo same for above
-    directions = []
-    for plot in data:
-        dirc = [val for key,val in (plot.values())[0][0]['fixed'] if key == 'direction']
-        if dirc != None:
-            directions.append(dirc[0])
-
-    for index in range(0,4):
-        f.write(
-            plot_simple_groups.format(
-                title = 'type grouping ' + directions[index], filename = filename, index = index, last_column = len(types)+2))
-
-    filtered_benchmarks = [remove_keys(x, ['has_reference_types']) for x in benchmarks if x['dynamic_size'] == 0 and x['return_type'] != '"void"']
-
-    filename = os.path.join(plotpath, 'plotdata_returntypes.data')
-    write_plotdata(plotpath, filename, filtered_benchmarks, {
-            'group'    : 'return_type',
-            'measure'  : 'response_time_millis',
-            'variable' : 'direction',
-            'min_series_width' : 2,
-            'sort'     : 'response_time_millis',
-             'measure_count' : measure_count
-            })
-
-    f.write("set title 'return types'\n"
-           "unset label 1\n"
-           "plot for [I=3:{limit}] '{filename}' using I:xtic(2) title columnhead with linespoints".format(
-        limit=len(types)+2, filename = filename))
+    plot(
+        benchmarks, f, plotpath,
+        template = plot_named_columns,
+        title = 'Return types',
+        keys_to_remove = ['has_reference_types'],
+        select_predicate = (
+            lambda x: x['dynamic_size'] == 0 and
+            x['return_type'] != 'void'),
+        group = 'return_type',
+        measure = 'response_time_millis',
+        variable = 'direction',
+        measure_count = measure_count,
+        num_groups = len(types),
+        min_series_width = 2)
+    # had: sort 'response_time_millis', min_series_width: 2 , unused?
     
         
 def write_plotdata(path, filename, benchmarks, specs):
