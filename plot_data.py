@@ -210,7 +210,12 @@ def comp_function(keys, left, right):
         if l > r:
             return 1
     return 0        
-            
+
+def format_value(value):
+    if type(value) == str:
+        return '"{0}"'.format(value)
+    else:
+        return str(value)
 
 def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, min_series_width=None, measure_count=None):
     result = ""
@@ -221,7 +226,7 @@ def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, m
 
         headers = []
         headers.append('"{v}"'.format(v=variable))
-        headers.extend(series.keys())
+        headers.extend([format_value(value) for value in series.keys()])
         result += '"m:{measure} v:{variable} g:{group}" {headers}\n'.format(
             measure=measure,
             variable=variable,
@@ -244,11 +249,7 @@ def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, m
                         var_value = grp[idx][variable]
                     except KeyError as e:
                         print variable
-                    if type(var_value) == str:
-                        real_value = '"{0}"'.format(var_value)
-                    else:
-                        real_value = var_value
-                    result += str(dict(grp[idx]['info'])['no']) + ' ' + str(real_value) + ' '
+                    result += str(dict(grp[idx]['info'])['no']) + ' ' + format_value(var_value) + ' '
                 else:
                     if var_value != grp[idx][variable]:
 #                    debugdata.write(pp.pformat(series))
@@ -468,7 +469,8 @@ def read_measurement_metadata(mfile):
     return compatibles
 
 MEASUREMENT_FILE = 'measurements.txt'
-MEASUREMENT_PATH = '/home/tituomin/Ubuntu One/gradu/measurements'
+MEASUREMENT_PATH = '/cs/fs/home/tituomin/Ubuntu One/gradu/measurements'
+#MEASUREMENT_PATH = '~/Ubuntu One/gradu/measurements'
 DEVICE_PATH = '/sdcard/results'
 PLOTPATH = '/tmp'
 TOOL_NAMESPACE = 'fi.helsinki.cs.tituomin.nativebenchmark.measuringtool'
