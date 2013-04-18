@@ -51,7 +51,7 @@ types = reference_types[:]
 types.extend(primitive_types)
 
 SEPARATOR = ','
-NUMERICAL = '[0-9]+'
+NUMERICAL = '-?[0-9]+'
 re_numerical = re.compile(NUMERICAL)
 
 def explode(line):
@@ -305,6 +305,9 @@ def plot(
         for x in benchmarks
         if select_predicate(x)]
 
+    if len(filtered_benchmarks) == 0:
+        print 'Error, no benchmarks for ', title
+
     data = write_plotdata(plotpath, filename, filtered_benchmarks, {
          'group'         : group,
          'variable'      : variable, 
@@ -325,9 +328,12 @@ def all_values(data, key):
     directions = []
     return [get_fixed_value(plot.values()[0][0], key) for plot in data]
 
-def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count=None):
+def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_count=None):
     f = open(gnuplotcommands, 'w')
     f.write(init_plots_gp.format(filename=output))
+
+    custom_benchmarks = [bm for bm in all_benchmarks if bm['no'] == -1]
+    benchmarks = [bm for bm in all_benchmarks if bm['no'] != -1]
 
     type_counts = ["parameter_type_{t}_count".format(t=tp) for tp in types]
     keys_to_remove = type_counts[:]
@@ -356,7 +362,7 @@ def plot_benchmarks(benchmarks, output, plotpath, gnuplotcommands, measure_count
                 lambda x: (
                     x['direction'] == direction and
                     x['has_reference_types'] == 1 and
-                    x['single_type'] in [t for t in reference_types] and
+                    x['single_type'] in reference_types and
                     x['parameter_count'] == 1)),
             group = 'single_type',
             variable = 'dynamic_size',
