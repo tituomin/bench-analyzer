@@ -288,7 +288,16 @@ unset label 1
 plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title columnhead with linespoints
 """
 
+plot_named_columns_vertical = """
+set title '{title}'
+unset label 1
+set xtics rotate
+plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title columnhead with histogram
+"""
+
 def without(keys, d):
+    if keys == None:
+        return d
     dnew = odict()
     for key, val in d.iteritems():
         if key not in  keys:
@@ -308,6 +317,7 @@ def plot(
 
     if len(filtered_benchmarks) == 0:
         print 'Error, no benchmarks for ', title
+        exit(1)
 
     data = write_plotdata(plotpath, filename, filtered_benchmarks, {
          'group'         : group,
@@ -339,6 +349,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
     type_counts = ["parameter_type_{t}_count".format(t=tp) for tp in types]
     keys_to_remove = type_counts[:]
     keys_to_remove.extend(['parameter_type_count', 'single_type'])
+
+    defaults = [benchmarks, f, plotpath]
 
     for i, ptype in enumerate(types):
         plot(
@@ -421,7 +433,34 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
         num_groups = len(types),
         min_series_width = 2)
     # had: sort 'response_time_millis', min_series_width: 2 , unused?
-    
+
+    plot(
+        custom_benchmarks, f, plotpath,
+        template = plot_simple_groups,
+        title = 'Measuring overhead',
+        keys_to_remove = [],
+        select_predicate = (
+            lambda x: 'fi.helsinki.cs.tituomin.nativebenchmark.benchmark.C2JOverhead' in x['class']),
+        group = 'direction',
+        measure = 'response_time_millis',
+        variable = 'description',
+        measure_count = measure_count,
+        num_groups = 1)
+
+    plot(
+        custom_benchmarks, f, plotpath,
+        measure_count=measure_count,
+        template = plot_named_columns_vertical,
+        title = 'Custom, non-dynamic',
+        select_predicate = (
+            lambda x: (x['dynamic_size'] == 0 and
+            'fi.helsinki.cs.tituomin.nativebenchmark.benchmark.C2JOverhead' not in x['class'])),
+        group = 'direction',
+        num_groups = 1,
+        measure = 'response_time_millis',
+        variable = 'class')
+
+#    dynamic_benchmarks = [x for x in benchmark]
         
 def write_plotdata(path, filename, benchmarks, specs):
     plotdata = open(filename, 'w')
