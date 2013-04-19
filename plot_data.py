@@ -57,9 +57,16 @@ re_numerical = re.compile(NUMERICAL)
 def explode(line):
     return line.split(SEPARATOR)
 
-def value(string):
+def value(string, key=None):
+    if key == 'class':
+        return string.split('.')[-1]
     if string == '-':
-        return 0
+        # todo: notice ! 
+        # the zero-size sizeables
+        # are compared to the rest ...
+        if key == 'dynamic_size':
+            return 0
+        return None
     if re_numerical.match(string):
         return int(string)
     else:
@@ -71,7 +78,7 @@ def add_derived_values(benchmark, index):
         single_type = 'any'
     elif (benchmark['parameter_type_count'] == 1):
         for tp in types:
-            if benchmark['parameter_type_{t}_count'.format(t=tp)] != 0:
+            if benchmark['parameter_type_{t}_count'.format(t=tp)] != None:
                 single_type = tp
                 break
     benchmark['single_type'] = single_type
@@ -97,7 +104,7 @@ def read_datafiles(files):
                 exit(1)
 
             benchmark = odict(
-                [(key,value(string)) for
+                [(key,value(string,key=key)) for
                  key, string in
                  zip(labels, exploded_line)])
 
@@ -137,6 +144,7 @@ def extract_data(benchmarks,
 
     compare_function = functools.partial(comp_function, sorted_keys)
     sorted_benchmarks = sorted(benchmarks, cmp=compare_function)
+#    debugdata.write(pp.pformat(sorted_benchmarks))
 
     if len(benchmarks) % measure_count != 0:
         print 'error not divisible by', measure_count, len(benchmarks)
@@ -144,7 +152,7 @@ def extract_data(benchmarks,
 
     groups = odict()
     for i in range(0, len(benchmarks), measure_count):
-        benchmarks_to_combine = sorted_benchmarks[i:i+measure_count]
+        benchmarks_to_combine = sorted_benchmarks[i : i + measure_count]
         values = [bm[measure] for bm in benchmarks_to_combine]
 
         last_bm = None
@@ -179,7 +187,14 @@ def extract_data(benchmarks,
             series.setdefault(el[group], []).append(el)
         series_collection.append(series)
 
-    return [x for x in series_collection if len((x.values())[0]) >= min_series_length]
+    result = [x for x in series_collection if len((x.values())[0]) >= min_series_length]
+
+    for series in result:
+        if len(series.values()) == 1:
+            for key, group in series.iteritems():
+                series[key] = sorted(group, key=lambda x: x[measure])
+
+    return result
 
 
 def mean(values):
@@ -190,6 +205,7 @@ def comp_function(keys, left, right):
     for key in keys:
         if key == 'index':
             return 0
+
         l, r = left[key], right[key]
         ordering = {
             'C > C' : 0,
@@ -201,12 +217,13 @@ def comp_function(keys, left, right):
         if l in ordering.keys() and r in ordering.keys():
             l, r = ordering[l], ordering[r]
 
-        if l == None:
-            return -1
-        if r == None:
-            return 1
         if l < r:
             return -1
+        # if l == None and r != None:
+        #     return -1
+
+        # if r == None and l != None:
+        #     return 1
         if l > r:
             return 1
     return 0        
@@ -239,9 +256,9 @@ def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, m
             i = 0
             for key, grp in series.iteritems():
                 if len(last_grp) != len(grp):
-                    print 'error different lenght groups'
-                    print last_grp
-                    print grp
+                    print 'error different length groups'
+                    debugdata.write(pp.pformat(last_grp))
+                    debugdata.write(pp.pformat(grp))
                     exit(1)
                 
                 if i == 0:
@@ -292,7 +309,8 @@ plot_named_columns_vertical = """
 set title '{title}'
 unset label 1
 set xtics rotate
-plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title columnhead with histogram
+set style fill solid border lc rgbcolor "black"
+plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title columnhead with boxes
 """
 
 def without(keys, d):
@@ -309,6 +327,7 @@ def plot(
     group=None, variable=None, measure=None, measure_count=None, title=None, num_groups=None,
     template=None, min_series_width=1):
 
+    print 'Plotting', title
     filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
     filtered_benchmarks = [
         without(keys_to_remove, x)
@@ -357,8 +376,10 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
             benchmarks, f, plotpath,
             title = ptype,
             template = plot_simple_groups,
-            keys_to_remove = keys_to_remove,
-            select_predicate = lambda x: x['single_type'] in [ptype, 'any'],
+            keys_to_remove = keys_to_remove + ['dynamic_size'],
+            select_predicate = lambda x: (
+                x['single_type'] in [ptype, 'any'] and
+                x['dynamic_size'] == 0),
             group = 'direction',
             variable = 'parameter_count',
             measure = 'response_time_millis',
@@ -440,7 +461,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
         title = 'Measuring overhead',
         keys_to_remove = [],
         select_predicate = (
-            lambda x: 'fi.helsinki.cs.tituomin.nativebenchmark.benchmark.C2JOverhead' in x['class']),
+            lambda x: 'C2JOverhead' in x['class']),
         group = 'direction',
         measure = 'response_time_millis',
         variable = 'description',
@@ -454,13 +475,25 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
         title = 'Custom, non-dynamic',
         select_predicate = (
             lambda x: (x['dynamic_size'] == 0 and
-            'fi.helsinki.cs.tituomin.nativebenchmark.benchmark.C2JOverhead' not in x['class'])),
+            'C2JOverhead' not in x['class'])),
         group = 'direction',
         num_groups = 1,
         measure = 'response_time_millis',
         variable = 'class')
 
-#    dynamic_benchmarks = [x for x in benchmark]
+    plot(
+        custom_benchmarks, f, plotpath,
+        measure_count=measure_count,
+        template = plot_simple_groups,
+        title = 'Custom, dynamic',
+        select_predicate = (
+            lambda x: (x['dynamic_size'] > 0 and
+            'C2JOverhead' not in x['class'])),
+        group = 'class',
+        num_groups = 45, # todo don't count by hand
+        measure = 'response_time_millis',
+        variable = 'dynamic_size')
+
         
 def write_plotdata(path, filename, benchmarks, specs):
     plotdata = open(filename, 'w')
@@ -508,8 +541,6 @@ def read_measurement_metadata(mfile):
     return compatibles
 
 MEASUREMENT_FILE = 'measurements.txt'
-MEASUREMENT_PATH = '/cs/fs/home/tituomin/Ubuntu One/gradu/measurements'
-#MEASUREMENT_PATH = '~/Ubuntu One/gradu/measurements'
 DEVICE_PATH = '/sdcard/results'
 PLOTPATH = '/tmp'
 TOOL_NAMESPACE = 'fi.helsinki.cs.tituomin.nativebenchmark.measuringtool'
@@ -538,17 +569,18 @@ def sync_measurements(dev_path, host_path, filename, update=True):
 
 
 if __name__ == '__main__':
-    if len(argv) <  4 or len(argv) > 4:
-        print "\n    Usage: python plot_data.py pdfoutput gnuplotcommands limit\n"
+    if len(argv) <  5 or len(argv) > 5:
+        print "\n    Usage: python plot_data.py measurement_path pdfoutput gnuplotcommands limit\n"
         exit(1)
 
-    output = argv[1]
-    gnuplotoutput = argv[2]
-    limit = argv[3]
+    measurement_path = argv[1]
+    output = argv[2]
+    gnuplotoutput = argv[3]
+    limit = argv[4]
 
-    sync_measurements(DEVICE_PATH, MEASUREMENT_PATH, MEASUREMENT_FILE)
+    sync_measurements(DEVICE_PATH, measurement_path, MEASUREMENT_FILE)
 
-    f = open(os.path.join(MEASUREMENT_PATH, MEASUREMENT_FILE))
+    f = open(os.path.join(measurement_path, MEASUREMENT_FILE))
 
     try:
         measurements = read_measurement_metadata(f)
@@ -589,8 +621,8 @@ if __name__ == '__main__':
 
     files = []
     for filename in filenames:
-        sync_measurements(DEVICE_PATH, MEASUREMENT_PATH, filename, update=False)
-        files.append(open(os.path.join(MEASUREMENT_PATH, filename)))
+        sync_measurements(DEVICE_PATH, measurement_path, filename, update=False)
+        files.append(open(os.path.join(measurement_path, filename)))
     try:
         benchmarks = read_datafiles(files)
     finally:
@@ -601,5 +633,6 @@ if __name__ == '__main__':
 
     measure_count = len(benchmark_group)
     plot_benchmarks(benchmarks, output, PLOTPATH, gnuplotoutput, measure_count=measure_count)
+    call(["gnuplot", gnuplotoutput])
     exit(0)
     
