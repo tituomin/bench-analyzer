@@ -335,7 +335,7 @@ def plot(
         if select_predicate(x)]
 
     if len(filtered_benchmarks) == 0:
-        print 'Error, no benchmarks for ', title
+        print 'Error, no benchmarks for', title
         exit(1)
 
     data = write_plotdata(plotpath, filename, filtered_benchmarks, {
@@ -361,6 +361,10 @@ def all_values(data, key):
 def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_count=None):
     f = open(gnuplotcommands, 'w')
     f.write(init_plots_gp.format(filename=output))
+
+    print len(all_benchmarks)
+    all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None]
+    print len(all_benchmarks)
 
     custom_benchmarks = [bm for bm in all_benchmarks if bm['no'] == -1]
     benchmarks = [bm for bm in all_benchmarks if bm['no'] != -1]
