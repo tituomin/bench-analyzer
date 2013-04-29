@@ -89,12 +89,14 @@ def read_datafiles(files):
     benchmarks = []
     #-1: there is an empty field at the end...
 
-    line = None
-    for f in files:
-        line = f.readline()
-    labels = explode(line)[:-1]
+    keys_with_values = set()
+    all_keys = set()
 
     for i, f in enumerate(files):
+        line = f.readline()
+        labels = explode(line)[:-1]
+        all_keys.update(labels)
+
         line = f.readline()
         lineno = 1
         while line != '':
@@ -103,15 +105,33 @@ def read_datafiles(files):
                 print 'missing values', f.name, 'line', lineno, 'labels', len(labels), 'values', len(exploded_line)
                 exit(1)
 
-            benchmark = odict(
-                [(key,value(string,key=key)) for
-                 key, string in
-                 zip(labels, exploded_line)])
+            benchmark = odict()
+
+            for key, string in zip(labels, exploded_line):
+                benchmark[key] = value(string, key=key)
+
+                if value(string, key=key) != None:
+                    keys_with_values.add(key)
 
             add_derived_values(benchmark, i)
             benchmarks.append(benchmark)
             line = f.readline()
             lineno += 1
+
+    keys_without_values = all_keys - keys_with_values
+    print 'No values for', keys_without_values
+
+    benchmark_keycount = None
+    for benchmark in benchmarks:
+        for key in keys_without_values:
+            if key in benchmark:
+                del benchmark[key]
+        current_keycount = len(benchmark.keys())
+        benchmark_keycount = benchmark_keycount or current_keycount
+        if benchmark_keycount != current_keycount:
+            print "Benchmarks have different amount of data", benchmark_keycount, current_keycount
+            exit(1)
+
     print 'Read %d lines' % (lineno - 1)
     return benchmarks
 
@@ -334,6 +354,11 @@ def plot(
         for x in benchmarks
         if select_predicate(x)]
 
+    variables = set([benchmark[variable] for benchmark in filtered_benchmarks])
+    if len(variables) < 2:
+        print 'Skipping plot without enough data variables\n'
+        return
+
     if len(filtered_benchmarks) == 0:
         print 'Error, no benchmarks for', title
         exit(1)
@@ -362,9 +387,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
     f = open(gnuplotcommands, 'w')
     f.write(init_plots_gp.format(filename=output))
 
-    print len(all_benchmarks)
-    all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None]
-    print len(all_benchmarks)
+    all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
 
     custom_benchmarks = [bm for bm in all_benchmarks if bm['no'] == -1]
     benchmarks = [bm for bm in all_benchmarks if bm['no'] != -1]
