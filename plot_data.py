@@ -651,12 +651,17 @@ if __name__ == '__main__':
         sync_measurements(DEVICE_PATH, measurement_path, filename, update=False)
         files.append(open(os.path.join(measurement_path, filename)))
     try:
+        for measurement in benchmark_group:
+            if measurement['tool'] == TOOL_NAMESPACE + '.LinuxPerfRecordTool':
+                print 'Nothing to be done for perf data. Exiting.'
+            exit(0)
         benchmarks = read_datafiles(files)
     finally:
         for f in files:
             f.close()
 
 #    pp.pprint(benchmarks)
+
 
     measure_count = len(benchmark_group)
     plot_benchmarks(benchmarks, output, PLOTPATH, gnuplotoutput, measure_count=measure_count)
