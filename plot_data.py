@@ -147,7 +147,11 @@ def extract_data(benchmarks,
     additional_info = []
     if re.match('parameter_type_.+count', variable):
         additional_info.append('parameter_count')
-    additional_info.extend(['no', 'description', 'class'])
+    additional_info.extend(['no', 'description'])
+#    if variable != 'class':
+#        additional_info.append('class')
+    if variable != 'id':
+        additional_info.append('id')
 
     # the actual fields we're analyzing
     focus = explode(group)
@@ -363,12 +367,18 @@ def plot(
         print 'Error, no benchmarks for', title
         exit(1)
 
-    data = write_plotdata(plotpath, filename, filtered_benchmarks, {
+    specs = {
          'group'         : group,
          'variable'      : variable, 
          'measure'       : measure,
          'measure_count' : measure_count,
-         'min_series_width' : min_series_width})
+         'min_series_width' : min_series_width}
+
+    data = extract_data(filtered_benchmarks, **specs)
+
+    plotdata = open(filename, 'w')
+    # debugdata.write(pp.pformat(data))    
+    plotdata.write(print_benchmarks(data, **specs))
 
     gnuplot_script.write(template.format(
        title = title, filename = filename, index = 0, last_column = 2 + num_groups))
@@ -488,7 +498,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
         title = 'Measuring overhead',
         keys_to_remove = [],
         select_predicate = (
-            lambda x: 'C2JOverhead' in x['class']),
+            lambda x: 'Overhead' in x['id']),
         group = 'direction',
         measure = 'response_time_millis',
         variable = 'description',
@@ -501,12 +511,13 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
         template = plot_named_columns_vertical,
         title = 'Custom, non-dynamic',
         select_predicate = (
-            lambda x: (x['dynamic_size'] == 0 and
-            'C2JOverhead' not in x['class'])),
+            lambda x: (
+                x['dynamic_size'] == 0 and
+                'Overhead' not in x['id'])),
         group = 'direction',
         num_groups = 1,
         measure = 'response_time_millis',
-        variable = 'class')
+        variable = 'id')
 
     plot(
         custom_benchmarks, f, plotpath,
@@ -515,18 +526,14 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
         title = 'Custom, dynamic',
         select_predicate = (
             lambda x: (x['dynamic_size'] > 0 and
-            'C2JOverhead' not in x['class'])),
-        group = 'class',
+            'Overhead' not in x['id'])),
+        group = 'id',
         num_groups = 45, # todo don't count by hand
         measure = 'response_time_millis',
         variable = 'dynamic_size')
 
         
-def write_plotdata(path, filename, benchmarks, specs):
-    plotdata = open(filename, 'w')
-    data = extract_data(benchmarks, **specs)
-    # debugdata.write(pp.pformat(data))    
-    plotdata.write(print_benchmarks(data, **specs))
+def write_plotdata(path, filename, data, specs):
     return data
 
 
@@ -654,7 +661,7 @@ if __name__ == '__main__':
         for measurement in benchmark_group:
             if measurement['tool'] == TOOL_NAMESPACE + '.LinuxPerfRecordTool':
                 print 'Nothing to be done for perf data. Exiting.'
-            exit(0)
+                exit(0)
         benchmarks = read_datafiles(files)
     finally:
         for f in files:
