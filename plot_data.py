@@ -72,7 +72,7 @@ def value(string, key=None):
     else:
         return string
 
-def add_derived_values(benchmark, index):
+def add_derived_values(benchmark):
     single_type = None
     if (benchmark['parameter_count'] == 0):
         single_type = 'any'
@@ -82,9 +82,8 @@ def add_derived_values(benchmark, index):
                 single_type = tp
                 break
     benchmark['single_type'] = single_type
-    benchmark['index'] = index
 
-def read_datafiles(files):
+def read_datafiles(files, global_values):
     print 'Reading from %s files' % len(files)
     benchmarks = []
     #-1: there is an empty field at the end...
@@ -113,7 +112,11 @@ def read_datafiles(files):
                 if value(string, key=key) != None:
                     keys_with_values.add(key)
 
-            add_derived_values(benchmark, i)
+            add_derived_values(benchmark)
+            for key, val in global_values.iteritems():
+                if key not in benchmark or benchmark[key] == None:
+                    benchmark[key] = val
+
             benchmarks.append(benchmark)
             line = f.readline()
             lineno += 1
@@ -137,82 +140,101 @@ def read_datafiles(files):
 
 def extract_data(benchmarks,
                  group=None, variable=None, measure=None,
-                 min_series_length=2, sort=None, measure_count=None, min_series_width=None):
+                 min_series_length=2, sort=None, min_series_width=None):
 
-    if variable != 'index':
-        for bm in benchmarks:
-            del bm['index']
-        
-    # from all sorting / variable controlling
-    additional_info = []
+    # extra metadata not to be analyzed
+    info = [
+        'no',
+        'description']
+
+    if 'class' in benchmarks[0]:
+        info.append('class')
+
     if re.match('parameter_type_.+count', variable):
-        additional_info.append('parameter_count')
-    additional_info.extend(['no', 'description'])
-#    if variable != 'class':
-#        additional_info.append('class')
+        info.append('parameter_count')
     if variable != 'id':
-        additional_info.append('id')
+        info.append('id')
 
-    # the actual fields we're analyzing
-    focus = explode(group)
-    focus.append(variable)
-    focus.append(measure)
+    # add the actual keys of interest
+    sort_last = ([group, variable, measure] + info)
 
-    exclude_from_sorting = []
-    exclude_from_sorting.extend(additional_info)
-    exclude_from_sorting.extend(focus)
-
-    controlled_variables = [x for x in benchmarks[0].keys() if x not in exclude_from_sorting]
-    sorted_keys = controlled_variables[:]
-    sorted_keys.extend(exclude_from_sorting)
+    # note: all the benchmarks have the same keyset
+    controlled_variables = set(benchmarks[0].keys()) - set(sort_last)
+    sorted_keys = list(controlled_variables) + sort_last
 
     compare_function = functools.partial(comp_function, sorted_keys)
     sorted_benchmarks = sorted(benchmarks, cmp=compare_function)
-#    debugdata.write(pp.pformat(sorted_benchmarks))
 
-    if len(benchmarks) % measure_count != 0:
-        print 'error not divisible by', measure_count, len(benchmarks)
-        exit(1)
+    # Step 1: Statistically combine multiple measured values
 
-    groups = odict()
-    for i in range(0, len(benchmarks), measure_count):
-        benchmarks_to_combine = sorted_benchmarks[i : i + measure_count]
-        values = [bm[measure] for bm in benchmarks_to_combine]
+    combined_benchmarks = []
 
-        last_bm = None
-        for bm in benchmarks_to_combine:
-            if last_bm != None:
-                for key in filter(lambda x: x != measure, bm.keys()):
-                    if last_bm[key] != bm[key]:
-                        print 'error non matching keys', key
-            last_bm = bm
+    for _, benchmarks_to_combine in itertools.groupby(
+        sorted_benchmarks, 
+        # first sort without measured value
+        # in order to combine measured values statistically
+        key=lambda b: tuple((k, b[k]) for k in (set(sorted_keys) - set([measure])))):
 
-        # take measure_count measurements, combine
-        benchmark = benchmarks_to_combine[0]
+        benchmark_list = list(benchmarks_to_combine)
+        benchmark = benchmark_list[0]
+
+        if len(benchmark_list) != benchmark['multiplier']:
+            print "Error: expecting", benchmark['multiplier'], "measurements, got", len(benchmark_list)
+            debugdata.write(_)
+            debugdata.write(pp.pformat(benchmark_list))
+            exit(1)
+
+        for bm in benchmark_list[1:]:
+            for key in filter(lambda x: x != measure, bm.keys()):
+                if benchmark[key] != bm[key]:
+                    print 'error non matching keys', key
+                    exit(1)
+
+        values = [bm[measure] for bm in benchmark_list]
         benchmark[measure] = min(values) # todo: parametrize combining function
+        combined_benchmarks.append(benchmark)
+        
+    # Step 2: Segment all measurements into plottable groups,
+    # with everything except the variable and measured value
+    # fixed within each group
 
-        fixed_data = tuple((key, benchmark[key]) for key in controlled_variables)
-        extra_data = tuple((key, benchmark[key]) for key in additional_info)
+    benchmarks_grouped_by_controlled_data = []
+    for fixed_data, benchmark_group in itertools.groupby(
+        combined_benchmarks,
+        key=lambda b: [(k, b[k]) for k in controlled_variables]):
 
-        element = {
-            'fixed'  : fixed_data,
-            'info'   : extra_data,
-            variable : benchmark[variable],
-            measure  : benchmark[measure],
-            group    : benchmark[group]}
+        benchmarks_grouped_by_controlled_data.append([
+                {
+                    'fixed'  : fixed_data,
+                    'info'   : tuple((key, benchmark[key]) for key in info),
+                    variable : benchmark[variable],
+                    measure  : benchmark[measure],
+                    group    : benchmark[group]}
 
-        my_group = groups.setdefault(fixed_data, [])
-        my_group.append(element)
+                for benchmark in benchmark_group])
+
+    # Step 3: Group these into a collection of lists
+    # with each list having a fixed group_field value
+    # and filter out lists with insufficient amount of
+    # elements
+
+    # todo : automatically find common benchmarks
+    # for groups in case some are missing?
+    # -> output outliers separately
 
     series_collection = []
-    for el_list in groups.values():
-        series = odict()
-        for el in el_list:
-            series.setdefault(el[group], []).append(el)
-        series_collection.append(series)
+    for el_list in benchmarks_grouped_by_controlled_data:
+        d = {}
+        for g, v in itertools.groupby(
+            el_list, key=lambda b: b[group]):
+            d[g] = list(v)
+        series_collection.append(d)
 
     result = [x for x in series_collection if len((x.values())[0]) >= min_series_length]
 
+    # Sort the results
+    # by measure for
+    # certain plots... TODO fix
     for series in result:
         if len(series.values()) == 1:
             for key, group in series.iteritems():
@@ -227,8 +249,8 @@ def mean(values):
 
 def comp_function(keys, left, right):
     for key in keys:
-        if key == 'index':
-            return 0
+        if key not in left and key not in right:
+            continue
 
         l, r = left[key], right[key]
         ordering = {
@@ -258,7 +280,7 @@ def format_value(value):
     else:
         return str(value)
 
-def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, min_series_width=None, measure_count=None):
+def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, min_series_width=None):
     result = ""
     for k, series in enumerate(data):
         if len(series.keys()) < min_series_width:
@@ -348,7 +370,7 @@ def without(keys, d):
 
 def plot(
     benchmarks, gnuplot_script, plotpath, keys_to_remove=None, select_predicate=None,
-    group=None, variable=None, measure=None, measure_count=None, title=None, num_groups=None,
+    group=None, variable=None, measure=None, title=None, num_groups=None,
     template=None, min_series_width=1):
 
     print 'Plotting', title
@@ -371,9 +393,9 @@ def plot(
          'group'         : group,
          'variable'      : variable, 
          'measure'       : measure,
-         'measure_count' : measure_count,
          'min_series_width' : min_series_width}
 
+    
     data = extract_data(filtered_benchmarks, **specs)
 
     plotdata = open(filename, 'w')
@@ -393,11 +415,11 @@ def all_values(data, key):
     directions = []
     return [get_fixed_value(plot.values()[0][0], key) for plot in data]
 
-def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_count=None):
+def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
     f = open(gnuplotcommands, 'w')
     f.write(init_plots_gp.format(filename=output))
 
-    all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
+    #all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
 
     custom_benchmarks = [bm for bm in all_benchmarks if bm['no'] == -1]
     benchmarks = [bm for bm in all_benchmarks if bm['no'] != -1]
@@ -420,7 +442,6 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
             group = 'direction',
             variable = 'parameter_count',
             measure = 'response_time_millis',
-            measure_count = measure_count,
             num_groups = 4)
 
     for direction in directions:
@@ -438,7 +459,6 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
             group = 'single_type',
             variable = 'dynamic_size',
             measure = 'response_time_millis',
-            measure_count = measure_count,
             num_groups = len(reference_types))
 
     for direction in directions:
@@ -454,7 +474,6 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
             group = 'return_type',
             variable = 'dynamic_size',
             measure = 'response_time_millis',
-            measure_count = measure_count,
             num_groups = len(reference_types))
 
 
@@ -472,7 +491,6 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
             group = 'single_type',
             variable = 'parameter_count',
             measure = 'response_time_millis',
-            measure_count = measure_count,
             num_groups = len(types))
     
 
@@ -487,7 +505,6 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
         group = 'return_type',
         measure = 'response_time_millis',
         variable = 'direction',
-        measure_count = measure_count,
         num_groups = len(types),
         min_series_width = 2)
     # had: sort 'response_time_millis', min_series_width: 2 , unused?
@@ -502,12 +519,10 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
         group = 'direction',
         measure = 'response_time_millis',
         variable = 'description',
-        measure_count = measure_count,
         num_groups = 1)
 
     plot(
         custom_benchmarks, f, plotpath,
-        measure_count=measure_count,
         template = plot_named_columns_vertical,
         title = 'Custom, non-dynamic',
         select_predicate = (
@@ -521,7 +536,6 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, measure_c
 
     plot(
         custom_benchmarks, f, plotpath,
-        measure_count=measure_count,
         template = plot_simple_groups,
         title = 'Custom, dynamic',
         select_predicate = (
@@ -657,21 +671,27 @@ if __name__ == '__main__':
     for filename in filenames:
         sync_measurements(DEVICE_PATH, measurement_path, filename, update=False)
         files.append(open(os.path.join(measurement_path, filename)))
+
+    first_measurement = benchmark_group[0]
+
+    global_values = {
+        'repetitions': first_measurement['repetitions'],
+        'multiplier' : len(benchmark_group)
+        }
+
     try:
-        for measurement in benchmark_group:
-            if measurement['tool'] == TOOL_NAMESPACE + '.LinuxPerfRecordTool':
-                print 'Nothing to be done for perf data. Exiting.'
-                exit(0)
-        benchmarks = read_datafiles(files)
+        if first_measurement['tool'] == TOOL_NAMESPACE + '.LinuxPerfRecordTool':
+            print 'Nothing to be done for perf data. Exiting.'
+            exit(0)
+        benchmarks = read_datafiles(files, global_values)
+
     finally:
         for f in files:
             f.close()
 
 #    pp.pprint(benchmarks)
 
-
-    measure_count = len(benchmark_group)
-    plot_benchmarks(benchmarks, output, PLOTPATH, gnuplotoutput, measure_count=measure_count)
+    plot_benchmarks(benchmarks, output, PLOTPATH, gnuplotoutput)
     call(["gnuplot", gnuplotoutput])
     exit(0)
     
