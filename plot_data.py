@@ -16,39 +16,37 @@ pp = pprint.PrettyPrinter(depth=10, indent=4)
 debugdata = open('/tmp/debug.txt', 'w')
 
 reference_types = [
-        'boolean[]',
-        'byte[]',
-        'char[]',
-        'double[]',
-        'float[]',
-        'int[]',
-        'long[]',
-        'short[]',
-        'java.lang.Object[]',
-        'java.lang.Class',
-        'java.lang.Object',
-        'java.lang.String',
-        'java.lang.Throwable'
+    'boolean[]',
+    'byte[]',
+    'char[]',
+    'double[]',
+    'float[]',
+    'int[]',
+    'long[]',
+    'short[]',
+    'java.lang.Object[]',
+    'java.lang.Class',
+    'java.lang.Object',
+    'java.lang.String',
+    'java.lang.Throwable'
     ]
 
 primitive_types = [
-        'boolean',
-        'byte',
-        'char',
-        'double',
-        'float',
-        'int',
-        'long',
-        'short'
-]
+    'boolean',
+    'byte',
+    'char',
+    'double',
+    'float',
+    'int',
+    'long',
+    'short'
+    ]
 
-directions = []
-for from_lang, to_lang in [('J', 'C'), ('J', 'J'), ('C','C'), ('C', 'J')]:
-    directions.append("%s > %s" % (from_lang, to_lang))
+directions = [
+    "%s > %s" % (fr, to) for fr, to in
+    [('J', 'C'), ('J', 'J'), ('C','C'), ('C', 'J')]]
 
-
-types = reference_types[:]
-types.extend(primitive_types)
+types = reference_types[:] + primitive_types
 
 SEPARATOR = ','
 NUMERICAL = '-?[0-9]+'
@@ -83,6 +81,14 @@ def add_derived_values(benchmark):
                 break
     benchmark['single_type'] = single_type
 
+def add_global_values(benchmark, global_values):
+    for key, val in global_values.iteritems():
+        if key not in benchmark or benchmark[key] == None:
+            benchmark[key] = val
+        elif key == 'multiplier' and benchmark[key] != None:
+            benchmark[key] *= val
+    
+
 def read_datafiles(files, global_values):
     print 'Reading from %s files' % len(files)
     benchmarks = []
@@ -113,9 +119,7 @@ def read_datafiles(files, global_values):
                     keys_with_values.add(key)
 
             add_derived_values(benchmark)
-            for key, val in global_values.iteritems():
-                if key not in benchmark or benchmark[key] == None:
-                    benchmark[key] = val
+            add_global_values(benchmark, global_values)
 
             benchmarks.append(benchmark)
             line = f.readline()
@@ -169,7 +173,7 @@ def extract_data(benchmarks,
 
     combined_benchmarks = []
 
-    for _, benchmarks_to_combine in itertools.groupby(
+    for key, benchmarks_to_combine in itertools.groupby(
         sorted_benchmarks, 
         # first sort without measured value
         # in order to combine measured values statistically
@@ -180,7 +184,7 @@ def extract_data(benchmarks,
 
         if len(benchmark_list) != benchmark['multiplier']:
             print "Error: expecting", benchmark['multiplier'], "measurements, got", len(benchmark_list)
-            debugdata.write(_)
+            debugdata.write(str(key))
             debugdata.write(pp.pformat(benchmark_list))
             exit(1)
 
@@ -206,7 +210,7 @@ def extract_data(benchmarks,
         benchmarks_grouped_by_controlled_data.append([
                 {
                     'fixed'  : fixed_data,
-                    'info'   : tuple((key, benchmark[key]) for key in info),
+                    'info'   : dict((key, benchmark[key]) for key in info),
                     variable : benchmark[variable],
                     measure  : benchmark[measure],
                     group    : benchmark[group]}
@@ -224,10 +228,10 @@ def extract_data(benchmarks,
 
     series_collection = []
     for el_list in benchmarks_grouped_by_controlled_data:
-        d = {}
+        d = odict() # important! ordered by group
         for g, v in itertools.groupby(
             el_list, key=lambda b: b[group]):
-            d[g] = list(v)
+                d[g] = dict((el[variable], el) for el in v)
         series_collection.append(d)
 
     result = [x for x in series_collection if len((x.values())[0]) >= min_series_length]
@@ -235,10 +239,10 @@ def extract_data(benchmarks,
     # Sort the results
     # by measure for
     # certain plots... TODO fix
-    for series in result:
-        if len(series.values()) == 1:
-            for key, group in series.iteritems():
-                series[key] = sorted(group, key=lambda x: x[measure])
+    # for series in result:
+    #     if len(series.values()) == 1:
+    #         for key, group in series.iteritems():
+    #             series[key] = sorted(group, key=lambda x: x[measure])
 
     return result
 
@@ -280,55 +284,32 @@ def format_value(value):
     else:
         return str(value)
 
-def print_benchmarks(data, group=None, variable=None, measure=None, sort=None, min_series_width=None):
-    result = ""
-    for k, series in enumerate(data):
+def print_benchmarks(data, title, group=None, variable=None, measure=None, sort=None, min_series_width=None):
+    result = "#{0}\n".format(title)
+    for series in data:
         if len(series.keys()) < min_series_width:
             # there are not enough groups to display
             continue
 
-        headers = []
-        headers.append('"{v}"'.format(v=variable))
-        headers.extend([format_value(value) for value in series.keys()])
-        result += '"m:{measure} v:{variable} g:{group}" {headers}\n'.format(
-            measure=measure,
-            variable=variable,
-            group=group, headers=" ".join(headers))
+        all_benchmark_variables = set()
+        for bm_list in series.itervalues():
+            all_benchmark_variables.update(bm_list.keys())
 
-        var_value = None
-        group_vals = []
-        last_grp = series.values()[0]
-        for idx in range(0, len(series.values()[0])):
-            i = 0
+        headers = " ".join(
+            ['"{0}"'.format(variable)] +
+            [format_value(value) for value in series.iterkeys()])
+
+        result += '"m:{0} v:{1} g:{2}" {3}\n'.format(
+            measure, variable, group, headers)
+
+        for variable in all_benchmark_variables:
+            result += '0 ' + format_value(variable)
             for key, grp in series.iteritems():
-                if len(last_grp) != len(grp):
-                    print 'error different length groups'
-                    debugdata.write(pp.pformat(last_grp))
-                    debugdata.write(pp.pformat(grp))
-                    exit(1)
-                
-                if i == 0:
-                    try:
-                        var_value = grp[idx][variable]
-                    except KeyError as e:
-                        print variable
-                    result += str(dict(grp[idx]['info'])['no']) + ' ' + format_value(var_value) + ' '
-                else:
-                    if var_value != grp[idx][variable]:
-#                    debugdata.write(pp.pformat(series))
-                        print 'Error: groups have different variables'
-                        print 'expected', var_value, 'has', grp[idx][variable]
-                        print 'key', key, 'k', k, 'series keys', series.keys()
-                        exit(1)
-                i += 1
-                val = grp[idx][measure]
-                if type(val) == str:
-                    val = '"{0}"'.format(val)
-                result += str(val) + ' '
-                last_grp = grp
-
+                result += ' '
+                result += format_value(grp.get(variable, {}).get(measure, -5000))
             result += "\n"
         result += "\n\n"
+
     return result
 
 init_plots_gp = """
@@ -354,9 +335,12 @@ plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title co
 plot_named_columns_vertical = """
 set title '{title}'
 unset label 1
+unset label 2
 set xtics rotate
 set style fill solid border lc rgbcolor "black"
-plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title columnhead with boxes
+set style data histograms
+set style histogram cluster 
+plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title columnhead
 """
 
 def without(keys, d):
@@ -390,17 +374,17 @@ def plot(
         exit(1)
 
     specs = {
-         'group'         : group,
-         'variable'      : variable, 
-         'measure'       : measure,
-         'min_series_width' : min_series_width}
+        'group'            : group,
+        'variable'         : variable, 
+        'measure'          : measure,
+        'min_series_width' : min_series_width}
 
     
     data = extract_data(filtered_benchmarks, **specs)
 
     plotdata = open(filename, 'w')
     # debugdata.write(pp.pformat(data))    
-    plotdata.write(print_benchmarks(data, **specs))
+    plotdata.write(print_benchmarks(data, title, **specs))
 
     gnuplot_script.write(template.format(
        title = title, filename = filename, index = 0, last_column = 2 + num_groups))
@@ -519,20 +503,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
         group = 'direction',
         measure = 'response_time_millis',
         variable = 'description',
-        num_groups = 1)
-
-    plot(
-        custom_benchmarks, f, plotpath,
-        template = plot_named_columns_vertical,
-        title = 'Custom, non-dynamic',
-        select_predicate = (
-            lambda x: (
-                x['dynamic_size'] == 0 and
-                'Overhead' not in x['id'])),
-        group = 'direction',
-        num_groups = 1,
-        measure = 'response_time_millis',
-        variable = 'id')
+        num_groups = 2)
 
     plot(
         custom_benchmarks, f, plotpath,
@@ -545,6 +516,19 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
         num_groups = 45, # todo don't count by hand
         measure = 'response_time_millis',
         variable = 'dynamic_size')
+
+    plot(
+        custom_benchmarks, f, plotpath,
+        template = plot_named_columns_vertical,
+        title = 'Custom, non-dynamic',
+        select_predicate = (
+            lambda x: (
+                x['dynamic_size'] == 0 and
+                'Overhead' not in x['id'])),
+        group = 'direction',
+        num_groups = 3,
+        measure = 'response_time_millis',
+        variable = 'id')
 
         
 def write_plotdata(path, filename, data, specs):
@@ -654,8 +638,13 @@ if __name__ == '__main__':
                first=m[0]['start'], last=m[-1]['end'])
 
             i += 1
+
+    try:
+        response = raw_input("Choose set 1-{last} >> ".format(last=i-1))
+    except EOFError:
+        print 'Exiting.'
+        exit(1)
     
-    response = raw_input("Choose set 1-{last} >> ".format(last=i-1))
     benchmark_group = limited_measurements[int(response) - 1]
 
     filenames = []
