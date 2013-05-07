@@ -59,11 +59,6 @@ def value(string, key=None):
     if key == 'class':
         return string.split('.')[-1]
     if string == '-':
-        # todo: notice ! 
-        # the zero-size sizeables
-        # are compared to the rest ...
-        if key == 'dynamic_size':
-            return 0
         return None
     if re_numerical.match(string):
         return int(string)
@@ -80,6 +75,12 @@ def add_derived_values(benchmark):
                 single_type = tp
                 break
     benchmark['single_type'] = single_type
+
+    if benchmark['dynamic_size'] == None:
+        benchmark['dynamic_variation'] = 0
+        benchmark['dynamic_size'] = 0
+    else:
+        benchmark['dynamic_variation'] = 1
 
 def add_global_values(benchmark, global_values):
     for key, val in global_values.iteritems():
@@ -231,7 +232,7 @@ def extract_data(benchmarks,
         d = odict() # important! ordered by group
         for g, v in itertools.groupby(
             el_list, key=lambda b: b[group]):
-                d[g] = dict((el[variable], el) for el in v)
+                d[g] = odict((el[variable], el) for el in v)
         series_collection.append(d)
 
     result = [x for x in series_collection if len((x.values())[0]) >= min_series_length]
@@ -291,9 +292,11 @@ def print_benchmarks(data, title, group=None, variable=None, measure=None, sort=
             # there are not enough groups to display
             continue
 
-        all_benchmark_variables = set()
+        all_benchmark_variables_set = set()
         for bm_list in series.itervalues():
-            all_benchmark_variables.update(bm_list.keys())
+            all_benchmark_variables_set.update(bm_list.keys())
+
+        all_benchmark_variables = sorted(list(all_benchmark_variables_set))
 
         headers = " ".join(
             ['"{0}"'.format(variable)] +
@@ -302,11 +305,11 @@ def print_benchmarks(data, title, group=None, variable=None, measure=None, sort=
         result += '"m:{0} v:{1} g:{2}" {3}\n'.format(
             measure, variable, group, headers)
 
-        for variable in all_benchmark_variables:
-            result += '0 ' + format_value(variable)
+        for v in all_benchmark_variables:
+            result += '0 ' + format_value(v)
             for key, grp in series.iteritems():
                 result += ' '
-                result += format_value(grp.get(variable, {}).get(measure, -5000))
+                result += format_value(grp.get(v, {}).get(measure, -500))
             result += "\n"
         result += "\n\n"
 
@@ -334,13 +337,15 @@ plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title co
 
 plot_named_columns_vertical = """
 set title '{title}'
-unset label 1
-unset label 2
+#unset label 1
+#unset label 2
 set xtics rotate
-set style fill solid border lc rgbcolor "black"
+#set boxwidth 20
+#set style fill solid border lc rgbcolor "black"
 set style data histograms
-set style histogram cluster 
-plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title columnhead
+set style histogram clustered
+set style fill solid 1.0 border lt -1
+plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title columnhead with histogram
 """
 
 def without(keys, d):
@@ -378,7 +383,6 @@ def plot(
         'variable'         : variable, 
         'measure'          : measure,
         'min_series_width' : min_series_width}
-
     
     data = extract_data(filtered_benchmarks, **specs)
 
@@ -463,12 +467,13 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
 
     keys_to_remove = type_counts[:]
     keys_to_remove.append('has_reference_types')
+    keys_to_remove.append('dynamic_variation')
 
     for direction in directions:
         plot(
             benchmarks, f, plotpath,
             template = plot_simple_groups,
-            title = 'type grouping ' + direction,
+            title = 'Type grouping ' + direction,
             keys_to_remove = keys_to_remove,
             select_predicate = (
                 lambda x: x['direction'] == direction),
@@ -482,7 +487,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
         benchmarks, f, plotpath,
         template = plot_named_columns,
         title = 'Return types',
-        keys_to_remove = ['has_reference_types'],
+        keys_to_remove = ['has_reference_types', 'dynamic_variation'],
         select_predicate = (
             lambda x: x['dynamic_size'] == 0 and
             x['return_type'] != 'void'),
@@ -505,17 +510,19 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
         variable = 'description',
         num_groups = 2)
 
-    plot(
-        custom_benchmarks, f, plotpath,
-        template = plot_simple_groups,
-        title = 'Custom, dynamic',
-        select_predicate = (
-            lambda x: (x['dynamic_size'] > 0 and
-            'Overhead' not in x['id'])),
-        group = 'id',
-        num_groups = 45, # todo don't count by hand
-        measure = 'response_time_millis',
-        variable = 'dynamic_size')
+    for direction in directions:
+        plot(
+            custom_benchmarks, f, plotpath,
+            template = plot_simple_groups,
+            title = 'Custom, dynamic ' + direction,
+            select_predicate = (
+                lambda x: (x['direction'] == direction and
+                           x['dynamic_variation'] == 1 and
+                           'Overhead' not in x['id'])),
+            group = 'id',
+            num_groups = 45, # todo don't count by hand
+            measure = 'response_time_millis',
+            variable = 'dynamic_size')
 
     plot(
         custom_benchmarks, f, plotpath,
@@ -523,7 +530,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
         title = 'Custom, non-dynamic',
         select_predicate = (
             lambda x: (
-                x['dynamic_size'] == 0 and
+                x['dynamic_variation'] == 0 and
                 'Overhead' not in x['id'])),
         group = 'direction',
         num_groups = 3,
