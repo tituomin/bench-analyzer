@@ -285,33 +285,29 @@ def format_value(value):
     else:
         return str(value)
 
-def print_benchmarks(data, title, group=None, variable=None, measure=None, sort=None, min_series_width=None):
+def print_benchmarks(series, title, group=None, variable=None, measure=None, sort=None, min_series_width=None):
     result = "#{0}\n".format(title)
-    for series in data:
-        if len(series.keys()) < min_series_width:
-            # there are not enough groups to display
-            continue
 
-        all_benchmark_variables_set = set()
-        for bm_list in series.itervalues():
-            all_benchmark_variables_set.update(bm_list.keys())
+    all_benchmark_variables_set = set()
+    for bm_list in series.itervalues():
+        all_benchmark_variables_set.update(bm_list.keys())
 
-        all_benchmark_variables = sorted(list(all_benchmark_variables_set))
+    all_benchmark_variables = sorted(list(all_benchmark_variables_set))
 
-        headers = " ".join(
-            ['"{0}"'.format(variable)] +
-            [format_value(value) for value in series.iterkeys()])
+    headers = " ".join(
+        ['"{0}"'.format(variable)] +
+        [format_value(value) for value in series.iterkeys()])
 
-        result += '"m:{0} v:{1} g:{2}" {3}\n'.format(
-            measure, variable, group, headers)
+    result += '"m:{0} v:{1} g:{2}" {3}\n'.format(
+        measure, variable, group, headers)
 
-        for v in all_benchmark_variables:
-            result += '0 ' + format_value(v)
-            for key, grp in series.iteritems():
-                result += ' '
-                result += format_value(grp.get(v, {}).get(measure, -500))
-            result += "\n"
-        result += "\n\n"
+    for v in all_benchmark_variables:
+        result += '0 ' + format_value(v)
+        for key, grp in series.iteritems():
+            result += ' '
+            result += format_value(grp.get(v, {}).get(measure, -500))
+        result += "\n"
+    result += "\n\n"
 
     return result
 
@@ -363,7 +359,7 @@ def plot(
     template=None, min_series_width=1):
 
     print 'Plotting', title
-    filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
+
     filtered_benchmarks = [
         without(keys_to_remove, x)
         for x in benchmarks
@@ -386,12 +382,18 @@ def plot(
     
     data = extract_data(filtered_benchmarks, **specs)
 
-    plotdata = open(filename, 'w')
-    # debugdata.write(pp.pformat(data))    
-    plotdata.write(print_benchmarks(data, title, **specs))
+    for series in data:
+        if len(series.keys()) < min_series_width:
+            # there are not enough groups to display
+            continue
 
-    gnuplot_script.write(template.format(
-       title = title, filename = filename, index = 0, last_column = 2 + num_groups))
+        filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
+        plotdata = open(filename, 'w')
+        # debugdata.write(pp.pformat(data))    
+        plotdata.write(print_benchmarks(series, title, **specs))
+
+        gnuplot_script.write(template.format(
+           title = title, filename = filename, index = 0, last_column = 2 + num_groups))
 
 def get_fixed_value(element, key):
     for k, v in element['fixed']:
