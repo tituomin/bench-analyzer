@@ -315,26 +315,24 @@ init_plots_gp = """
 set terminal pdfcairo size 32cm,18cm
 set output '{filename}'
 set key outside
+set size 1, 0.95
 set xlabel "Number of parameters"
 set ylabel "Response time (ms)"
+set label 1 "{bid}" at graph 0.01, graph 1.1
 """
 
 plot_simple_groups = """
 set title '{title}'
-unset label 1
 plot for [I=3:{last_column}] '{filename}' index {index} using 2:I title columnhead with linespoints
 """
 
 plot_named_columns = """
 set title '{title}'
-unset label 1
 plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title columnhead with linespoints
 """
 
 plot_named_columns_vertical = """
 set title '{title}'
-#unset label 1
-#unset label 2
 set xtics rotate
 #set boxwidth 20
 #set style fill solid border lc rgbcolor "black"
@@ -405,9 +403,8 @@ def all_values(data, key):
     directions = []
     return [get_fixed_value(plot.values()[0][0], key) for plot in data]
 
-def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
-    f = open(gnuplotcommands, 'w')
-    f.write(init_plots_gp.format(filename=output))
+def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
+    gnuplotcommands.write(init_plots_gp.format(filename=output, bid=bid))
 
     #all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
 
@@ -418,11 +415,11 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
     keys_to_remove = type_counts[:]
     keys_to_remove.extend(['parameter_type_count', 'single_type'])
 
-    defaults = [benchmarks, f, plotpath]
+    defaults = [benchmarks, gnuplotcommands, plotpath]
 
     for i, ptype in enumerate(types):
         plot(
-            benchmarks, f, plotpath,
+            benchmarks, gnuplotcommands, plotpath,
             title = ptype,
             template = plot_simple_groups,
             keys_to_remove = keys_to_remove + ['dynamic_size'],
@@ -436,7 +433,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
 
     for direction in directions:
         plot(
-            benchmarks, f, plotpath,
+            benchmarks, gnuplotcommands, plotpath,
             title = 'Dynamic size: parameters, direction ' + direction,
             template = plot_simple_groups,
             keys_to_remove = type_counts,
@@ -453,7 +450,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
 
     for direction in directions:
         plot(
-            benchmarks, f, plotpath,
+            benchmarks, gnuplotcommands, plotpath,
             title = 'Dynamic size: return types, direction ' + direction,
             template = plot_simple_groups,
             keys_to_remove = type_counts,
@@ -473,7 +470,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
 
     for direction in directions:
         plot(
-            benchmarks, f, plotpath,
+            benchmarks, gnuplotcommands, plotpath,
             template = plot_simple_groups,
             title = 'Type grouping ' + direction,
             keys_to_remove = keys_to_remove,
@@ -486,7 +483,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
     
 
     plot(
-        benchmarks, f, plotpath,
+        benchmarks, gnuplotcommands, plotpath,
         template = plot_named_columns,
         title = 'Return types',
         keys_to_remove = ['has_reference_types', 'dynamic_variation'],
@@ -501,7 +498,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
     # had: sort 'response_time_millis', min_series_width: 2 , unused?
 
     plot(
-        custom_benchmarks, f, plotpath,
+        custom_benchmarks, gnuplotcommands, plotpath,
         template = plot_simple_groups,
         title = 'Measuring overhead',
         keys_to_remove = [],
@@ -514,7 +511,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
 
     for direction in directions:
         plot(
-            custom_benchmarks, f, plotpath,
+            custom_benchmarks, gnuplotcommands, plotpath,
             template = plot_simple_groups,
             title = 'Custom, dynamic ' + direction,
             select_predicate = (
@@ -527,7 +524,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands):
             variable = 'dynamic_size')
 
     plot(
-        custom_benchmarks, f, plotpath,
+        custom_benchmarks, gnuplotcommands, plotpath,
         template = plot_named_columns_vertical,
         title = 'Custom, non-dynamic',
         select_predicate = (
@@ -610,14 +607,13 @@ def sync_measurements(dev_path, host_path, filename, update=True):
 
 
 if __name__ == '__main__':
-    if len(argv) <  5 or len(argv) > 5:
-        print "\n    Usage: python plot_data.py measurement_path pdfoutput gnuplotcommands limit\n"
+    if len(argv) < 4 or len(argv) > 4:
+        print "\n    Usage: python plot_data.py input_path output_path limit\n"
         exit(1)
 
     measurement_path = argv[1]
-    output = argv[2]
-    gnuplotoutput = argv[3]
-    limit = argv[4]
+    output_path = argv[2]
+    limit = argv[3]
 
     sync_measurements(DEVICE_PATH, measurement_path, MEASUREMENT_FILE)
 
@@ -657,6 +653,7 @@ if __name__ == '__main__':
     benchmark_group = limited_measurements[int(response) - 1]
 
     filenames = []
+    ids = []
     for measurement in benchmark_group:
         if measurement['tool'] == TOOL_NAMESPACE + '.LinuxPerfRecordTool':
             basename = "perfdata-{n}.zip"
@@ -664,6 +661,7 @@ if __name__ == '__main__':
             basename = "benchmarks-{n}.csv"
         filenames.append(
             basename.format(n=measurement['id']))
+        ids.append(measurement['id'])
 
     files = []
     for filename in filenames:
@@ -689,7 +687,16 @@ if __name__ == '__main__':
 
 #    pp.pprint(benchmarks)
 
-    plot_benchmarks(benchmarks, output, PLOTPATH, gnuplotoutput)
-    call(["gnuplot", gnuplotoutput])
+    benchmark_group_id = str(uuid.uuid4())
+    plotfilename = 'plot-{0}.gp'.format(benchmark_group_id)
+    plotfile = open(os.path.join(output_path, plotfilename), 'w')
+    metadata_f = open(os.path.join(output_path, 'plot-{0}-metadata.txt'.format(benchmark_group_id)), 'w')
+    metadata_f.write("id: {0}\n".format(benchmark_group_id))
+    metadata_f.write("measurements: {0}\n".format(" ".join(ids)))
+
+    plot_benchmarks(benchmarks, os.path.join(output_path, 'plot-{0}.pdf'.format(benchmark_group_id)), PLOTPATH, plotfile, benchmark_group_id)
+    plotfile.flush()
+    plotfile.close()
+    call(["gnuplot", plotfile.name])
     exit(0)
     
