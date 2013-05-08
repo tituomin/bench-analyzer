@@ -353,7 +353,7 @@ def without(keys, d):
 
 def plot(
     benchmarks, gnuplot_script, plotpath, keys_to_remove=None, select_predicate=None,
-    group=None, variable=None, measure=None, title=None, num_groups=None,
+    group=None, variable=None, measure=None, title=None,
     template=None, min_series_width=1):
 
     print 'Plotting', title
@@ -387,11 +387,11 @@ def plot(
 
         filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
         plotdata = open(filename, 'w')
-        # debugdata.write(pp.pformat(data))    
+        # debugdata.write(pp.pformat(data))
         plotdata.write(print_benchmarks(series, title, **specs))
 
         gnuplot_script.write(template.format(
-           title = title, filename = filename, index = 0, last_column = 2 + num_groups))
+           title = title, filename = filename, index = 0, last_column = 2 + len(series)))
 
 def get_fixed_value(element, key):
     for k, v in element['fixed']:
@@ -428,8 +428,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
                 x['dynamic_size'] == 0),
             group = 'direction',
             variable = 'parameter_count',
-            measure = 'response_time_millis',
-            num_groups = 4)
+            measure = 'response_time_millis')
 
     for direction in directions:
         plot(
@@ -445,8 +444,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
                     x['parameter_count'] == 1)),
             group = 'single_type',
             variable = 'dynamic_size',
-            measure = 'response_time_millis',
-            num_groups = len(reference_types))
+            measure = 'response_time_millis')
 
     for direction in directions:
         plot(
@@ -460,8 +458,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
                 and x['return_type'] != 'void'),
             group = 'return_type',
             variable = 'dynamic_size',
-            measure = 'response_time_millis',
-            num_groups = len(reference_types))
+            measure = 'response_time_millis')
 
 
     keys_to_remove = type_counts[:]
@@ -478,8 +475,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
                 lambda x: x['direction'] == direction),
             group = 'single_type',
             variable = 'parameter_count',
-            measure = 'response_time_millis',
-            num_groups = len(types))
+            measure = 'response_time_millis')
     
 
     plot(
@@ -493,7 +489,6 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
         group = 'return_type',
         measure = 'response_time_millis',
         variable = 'direction',
-        num_groups = len(types),
         min_series_width = 2)
     # had: sort 'response_time_millis', min_series_width: 2 , unused?
 
@@ -506,8 +501,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
             lambda x: 'Overhead' in x['id']),
         group = 'direction',
         measure = 'response_time_millis',
-        variable = 'description',
-        num_groups = 2)
+        variable = 'description')
 
     for direction in directions:
         plot(
@@ -519,7 +513,6 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
                            x['dynamic_variation'] == 1 and
                            'Overhead' not in x['id'])),
             group = 'id',
-            num_groups = 45, # todo don't count by hand
             measure = 'response_time_millis',
             variable = 'dynamic_size')
 
@@ -532,7 +525,6 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
                 x['dynamic_variation'] == 0 and
                 'Overhead' not in x['id'])),
         group = 'direction',
-        num_groups = 3,
         measure = 'response_time_millis',
         variable = 'id')
 
@@ -607,13 +599,17 @@ def sync_measurements(dev_path, host_path, filename, update=True):
 
 
 if __name__ == '__main__':
-    if len(argv) < 4 or len(argv) > 4:
-        print "\n    Usage: python plot_data.py input_path output_path limit\n"
+    if len(argv) < 4 or len(argv) > 5:
+        print "\n    Usage: python plot_data.py input_path output_path limit [pdfviewer]\n"
         exit(1)
 
     measurement_path = argv[1]
     output_path = argv[2]
     limit = argv[3]
+    if len(argv) == 5:
+        pdfviewer = argv[4]
+    else:
+        pdfviewer = None
 
     sync_measurements(DEVICE_PATH, measurement_path, MEASUREMENT_FILE)
 
@@ -688,15 +684,19 @@ if __name__ == '__main__':
 #    pp.pprint(benchmarks)
 
     benchmark_group_id = str(uuid.uuid4())
+    pdffilename = os.path.join(output_path, 'plot-{0}.pdf'.format(benchmark_group_id))
     plotfilename = 'plot-{0}.gp'.format(benchmark_group_id)
     plotfile = open(os.path.join(output_path, plotfilename), 'w')
     metadata_f = open(os.path.join(output_path, 'plot-{0}-metadata.txt'.format(benchmark_group_id)), 'w')
     metadata_f.write("id: {0}\n".format(benchmark_group_id))
     metadata_f.write("measurements: {0}\n".format(" ".join(ids)))
 
-    plot_benchmarks(benchmarks, os.path.join(output_path, 'plot-{0}.pdf'.format(benchmark_group_id)), PLOTPATH, plotfile, benchmark_group_id)
+    plot_benchmarks(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id)
     plotfile.flush()
     plotfile.close()
     call(["gnuplot", plotfile.name])
+    if pdfviewer:
+        call([pdfviewer, str(pdffilename)])
+    print "Final plot", str(pdffilename)
     exit(0)
     
