@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from sys import argv
-import itertools
+from itertools import groupby
 import functools
 import re
 import pprint
@@ -111,7 +111,7 @@ def read_datafiles(files, global_values):
                 print 'missing values', f.name, 'line', lineno, 'labels', len(labels), 'values', len(exploded_line)
                 exit(1)
 
-            benchmark = odict()
+            benchmark = dict()
 
             for key, string in zip(labels, exploded_line):
                 benchmark[key] = value(string, key=key)
@@ -147,95 +147,61 @@ def extract_data(benchmarks,
                  group=None, variable=None, measure=None,
                  min_series_length=2, sort=None, min_series_width=None):
 
-    # extra metadata not to be analyzed
-    info = [
-        'no',
-        'description']
+    # info == extra metadata not to be analyzed
+    info = ['no', 'description']
 
     if 'class' in benchmarks[0]:
         info.append('class')
-
     if re.match('parameter_type_.+count', variable):
         info.append('parameter_count')
     if variable != 'id':
         info.append('id')
 
-    # add the actual keys of interest
-    sort_last = ([group, variable, measure] + info)
+    # the actual keys of interest must have the least weight in sorting
+    sort_last = [group, variable, measure] + info
 
     # note: all the benchmarks have the same keyset
-    controlled_variables = set(benchmarks[0].keys()) - set(sort_last)
+    all_keys = set(benchmarks[0].keys())
+    controlled_variables = all_keys - set(sort_last)
     sorted_keys = list(controlled_variables) + sort_last
+ 
+    sorted_benchmarks = sorted(
+        benchmarks,
+        cmp=functools.partial(comp_function, sorted_keys))
 
-    compare_function = functools.partial(comp_function, sorted_keys)
-    sorted_benchmarks = sorted(benchmarks, cmp=compare_function)
+    # 1. group benchmarks into a multi-dimensional list of the structure
+    # compatible-measurements > plots > measured variables
 
-    # Step 1: Statistically combine multiple measured values
+    benchmarks = group_by_keys(sorted_benchmarks, controlled_variables)
+    for i, x  in enumerate(benchmarks):
+        benchmarks[i] = group_by_keys(x, [group])
+        for j, y in enumerate(benchmarks[i]):
+            benchmarks[i][j] = group_by_keys(y, [variable])
 
-    combined_benchmarks = []
+    # 2. statistically combine multiple measurements
+    # for the exact same benchmark and parameters,
+    # and store information about the roles
+    # of keys
 
-    for key, benchmarks_to_combine in itertools.groupby(
-        sorted_benchmarks, 
-        # first sort without measured value
-        # in order to combine measured values statistically
-        key=lambda b: tuple((k, b[k]) for k in (set(sorted_keys) - set([measure])))):
+    for i, compatibles in enumerate(benchmarks):
+        for j, plotgroups in enumerate(compatibles):
+            for k, measured_values in enumerate(plotgroups):
+                plotgroups[k] = aggregate_measurements(measured_values,
+                                                       measure, stat_fun=min)
 
-        benchmark_list = list(benchmarks_to_combine)
-        benchmark = benchmark_list[0]
+            compatibles[j] = odict(
+                (benchmark[variable], {
+                        'fixed'  : dict((key, benchmark[key]) for key in controlled_variables),
+                        'info'   : dict((key, benchmark[key]) for key in info),
+                        variable : benchmark[variable],
+                        measure  : benchmark[measure],
+                        group    : benchmark[group]
+                        }) for benchmark in compatibles[j])
 
-        if len(benchmark_list) != benchmark['multiplier']:
-            print "Error: expecting", benchmark['multiplier'], "measurements, got", len(benchmark_list)
-            debugdata.write(str(key))
-            debugdata.write(pp.pformat(benchmark_list))
-            exit(1)
+        benchmarks[i] = odict((bms.values()[0][group], bms) for bms in benchmarks[i])
 
-        for bm in benchmark_list[1:]:
-            for key in filter(lambda x: x != measure, bm.keys()):
-                if benchmark[key] != bm[key]:
-                    print 'error non matching keys', key
-                    exit(1)
-
-        values = [bm[measure] for bm in benchmark_list]
-        benchmark[measure] = min(values) # todo: parametrize combining function
-        combined_benchmarks.append(benchmark)
-        
-    # Step 2: Segment all measurements into plottable groups,
-    # with everything except the variable and measured value
-    # fixed within each group
-
-    benchmarks_grouped_by_controlled_data = []
-    for fixed_data, benchmark_group in itertools.groupby(
-        combined_benchmarks,
-        key=lambda b: [(k, b[k]) for k in controlled_variables]):
-
-        benchmarks_grouped_by_controlled_data.append([
-                {
-                    'fixed'  : fixed_data,
-                    'info'   : dict((key, benchmark[key]) for key in info),
-                    variable : benchmark[variable],
-                    measure  : benchmark[measure],
-                    group    : benchmark[group]}
-
-                for benchmark in benchmark_group])
-
-    # Step 3: Group these into a collection of lists
-    # with each list having a fixed group_field value
-    # and filter out lists with insufficient amount of
-    # elements
-
-    # todo : automatically find common benchmarks
-    # for groups in case some are missing?
-    # -> output outliers separately
-
-    series_collection = []
-    for el_list in benchmarks_grouped_by_controlled_data:
-        d = odict() # important! ordered by group
-        for g, v in itertools.groupby(
-            el_list, key=lambda b: b[group]):
-                d[g] = odict((el[variable], el) for el in v)
-        series_collection.append(d)
-
-    result = [x for x in series_collection if len((x.values())[0]) >= min_series_length]
+#    debugdata.write(pp.pformat(benchmarks))
+#    exit(0)
 
     # Sort the results
     # by measure for
@@ -245,8 +211,30 @@ def extract_data(benchmarks,
     #         for key, group in series.iteritems():
     #             series[key] = sorted(group, key=lambda x: x[measure])
 
-    return result
 
+    return [x for x in benchmarks if len((x.values())[0]) >= min_series_length]
+
+def group_by_keys(sorted_benchmarks, keyset):
+    # todo make into generator?
+    return [
+        list(y) for x,y in groupby(
+            sorted_benchmarks,
+            key=lambda b: [b[k] for k in keyset])]
+    
+def aggregate_measurements(benchmarks, measure, stat_fun=min):
+    values = []
+    benchmark = None
+    for benchmark in benchmarks:
+        values.append(benchmark[measure])
+
+    benchmark[measure] = stat_fun(values)
+
+    if len(values) != benchmark['multiplier']:
+        print "Error: expecting", benchmark['multiplier'], "measurements, got", len(values)
+        debugdata.write(pp.pformat(list(benchmarks)))
+        exit(1)
+
+    return benchmark
 
 def mean(values):
     return min(values)
@@ -345,7 +333,7 @@ plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title co
 def without(keys, d):
     if keys == None:
         return d
-    dnew = odict()
+    dnew = dict()
     for key, val in d.iteritems():
         if key not in  keys:
             dnew[key] = val
@@ -413,7 +401,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
 
     type_counts = ["parameter_type_{t}_count".format(t=tp) for tp in types]
     keys_to_remove = type_counts[:]
-    keys_to_remove.extend(['parameter_type_count', 'single_type'])
+    keys_to_remove.extend(['parameter_type_count', 'single_type', 'dynamic_variation'])
 
     defaults = [benchmarks, gnuplotcommands, plotpath]
 
@@ -548,12 +536,12 @@ def read_measurement_metadata(mfile):
             if measurement:
                 if 'tools' in measurement:
                     measurement['tool'] = measurement['tools']
-                checksum = measurement.get('code-checksum')
+                revision = measurement.get('code-revision')
                 repetitions = measurement.get('repetitions')
                 tool = measurement.get('tool')
                 cpufreq = measurement.get('cpu-freq')
-                if checksum and repetitions:
-                        key = (checksum, repetitions, tool, cpufreq)
+                if revision and repetitions:
+                        key = (revision, repetitions, tool, cpufreq)
                         if key not in compatibles:
                             compatibles[key] = []
                         compatibles[key].append(measurement)
