@@ -44,7 +44,7 @@ primitive_types = [
 
 directions = [
     "%s > %s" % (fr, to) for fr, to in
-    [('J', 'C'), ('J', 'J'), ('C','C'), ('C', 'J')]]
+    [('C', 'J'), ('J', 'C'), ('J', 'J'), ('C','C')]]
 
 types = reference_types[:] + primitive_types
 
@@ -170,8 +170,9 @@ def extract_data(benchmarks,
         cmp=functools.partial(comp_function, sorted_keys))
 
     # 1. group benchmarks into a multi-dimensional list of the structure
-    # compatible-measurements > plots > measured variables
-
+    # compatible-measurements (controlled variables are equal)
+    #     plots (list of individual data series ie. plots)
+    #         multiple measurements ()
     benchmarks = group_by_keys(sorted_benchmarks, controlled_variables)
     for i, x  in enumerate(benchmarks):
         benchmarks[i] = group_by_keys(x, [group])
@@ -180,8 +181,7 @@ def extract_data(benchmarks,
 
     # 2. statistically combine multiple measurements
     # for the exact same benchmark and parameters,
-    # and store information about the roles
-    # of keys
+    # and store information about the roles of keys
 
     for i, compatibles in enumerate(benchmarks):
         for j, plotgroups in enumerate(compatibles):
@@ -196,21 +196,9 @@ def extract_data(benchmarks,
                         variable : benchmark[variable],
                         measure  : benchmark[measure],
                         group    : benchmark[group]
-                        }) for benchmark in compatibles[j])
+                        }) for benchmark in plotgroups)
 
-        benchmarks[i] = odict((bms.values()[0][group], bms) for bms in benchmarks[i])
-
-#    debugdata.write(pp.pformat(benchmarks))
-#    exit(0)
-
-    # Sort the results
-    # by measure for
-    # certain plots... TODO fix
-    # for series in result:
-    #     if len(series.values()) == 1:
-    #         for key, group in series.iteritems():
-    #             series[key] = sorted(group, key=lambda x: x[measure])
-
+        benchmarks[i] = odict(sorted(((bms.values()[0][group], bms) for bms in benchmarks[i]), key=lambda x:x[0]))
 
     return [x for x in benchmarks if len((x.values())[0]) >= min_series_length]
 
@@ -274,28 +262,35 @@ def format_value(value):
         return str(value)
 
 def print_benchmarks(series, title, group=None, variable=None, measure=None, sort=None, min_series_width=None):
-    result = "#{0}\n".format(title)
-
     all_benchmark_variables_set = set()
     for bm_list in series.itervalues():
         all_benchmark_variables_set.update(bm_list.keys())
 
     all_benchmark_variables = sorted(list(all_benchmark_variables_set))
 
+    rows = []
+    for v in all_benchmark_variables:
+        row = []
+        row.append('0')
+        row.append(format_value(v))
+        for key, grp in series.iteritems():
+            row.append(format_value(grp.get(v, {}).get(measure, -500)))
+        rows.append(row)
+
+    if variable == 'id':
+        rows = sorted(rows, key=lambda x:int(x[2]))
+
     headers = " ".join(
         ['"{0}"'.format(variable)] +
         [format_value(value) for value in series.iterkeys()])
 
-    result += '"m:{0} v:{1} g:{2}" {3}\n'.format(
-        measure, variable, group, headers)
+    result = '#{0}\n"m:{0} v:{1} g:{2}" {3}\n'.format(
+        title, measure, variable, group, headers)
 
-    for v in all_benchmark_variables:
-        result += '0 ' + format_value(v)
-        for key, grp in series.iteritems():
-            result += ' '
-            result += format_value(grp.get(v, {}).get(measure, -500))
-        result += "\n"
-    result += "\n\n"
+    for row in rows:
+        result += ' '.join(row)
+        result += '\n'
+    result += '\n\n'
 
     return result
 
@@ -333,11 +328,7 @@ plot for [I=3:{last_column}] '{filename}' index {index} using I:xtic(2) title co
 def without(keys, d):
     if keys == None:
         return d
-    dnew = dict()
-    for key, val in d.iteritems():
-        if key not in  keys:
-            dnew[key] = val
-    return dnew
+    return dict(((key, val) for key, val in d.iteritems() if key not in keys))
 
 def plot(
     benchmarks, gnuplot_script, plotpath, keys_to_remove=None, select_predicate=None,
