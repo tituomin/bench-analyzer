@@ -157,11 +157,11 @@ def extract_data(benchmarks,
     if variable != 'id':
         info.append('id')
 
-    # the actual keys of interest must have the least weight in sorting
-    sort_last = [group, variable, measure] + info
-
     # note: all the benchmarks have the same keyset
     all_keys = set(benchmarks[0].keys())
+
+    # the actual keys of interest must have the least weight in sorting
+    sort_last = [group, variable, measure] + info
     controlled_variables = all_keys - set(sort_last)
     sorted_keys = list(controlled_variables) + sort_last
  
@@ -186,8 +186,9 @@ def extract_data(benchmarks,
     for i, compatibles in enumerate(benchmarks):
         for j, plotgroups in enumerate(compatibles):
             for k, measured_values in enumerate(plotgroups):
-                plotgroups[k] = aggregate_measurements(measured_values,
-                                                       measure, stat_fun=min)
+
+                plotgroups[k] = aggregate_measurements(
+                    measured_values, measure, stat_fun=min)
 
             compatibles[j] = odict(
                 (benchmark[variable], {
@@ -198,9 +199,12 @@ def extract_data(benchmarks,
                         group    : benchmark[group]
                         }) for benchmark in plotgroups)
 
-        benchmarks[i] = odict(sorted(((bms.values()[0][group], bms) for bms in benchmarks[i]), key=lambda x:x[0]))
+        benchmarks[i] = odict(sorted(((bms.values()[0][group], bms)
+                                      for bms in benchmarks[i]),
+                                     key=lambda x:x[0]))
 
-    return [x for x in benchmarks if len((x.values())[0]) >= min_series_length]
+    return [x for x in benchmarks
+            if len((x.values())[0]) >= min_series_length]
 
 def group_by_keys(sorted_benchmarks, keyset):
     # todo make into generator?
