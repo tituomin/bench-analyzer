@@ -288,7 +288,7 @@ def print_benchmarks(series, title, group=None, variable=None, measure=None, sor
         ['"{0}"'.format(variable)] +
         [format_value(value) for value in series.iterkeys()])
 
-    result = '#{0}\n"m:{0} v:{1} g:{2}" {3}\n'.format(
+    result = '#{0}\n"m:{1} v:{2} g:{3}" {4}\n'.format(
         title, measure, variable, group, headers)
 
     for row in rows:
