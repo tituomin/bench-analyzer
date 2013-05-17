@@ -72,6 +72,8 @@ def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, 
     return result
 
 def format_value(value):
+    if value == None:
+        return "-500"
     if type(value) == str:
         return '"{0}"'.format(value)
     else:

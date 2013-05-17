@@ -185,7 +185,7 @@ def without(keys, d):
     return dict(((key, val) for key, val in d.iteritems() if key not in keys))
 
 def plot(
-    benchmarks, gnuplot_script, plotpath, keys_to_remove=None, select_predicate=None,
+    benchmarks, gnuplot_script, plotpath, metadata_file, keys_to_remove=None, select_predicate=None,
     group=None, variable=None, measure=None, title=None,
     style=None, min_series_width=1):
 
@@ -219,15 +219,27 @@ def plot(
 
         plot.page += 1
 
+        axes_label = plot_axes.get(variable, '<unknown variable>')
+
         headers, rows = make_table(series, group, variable, measure)
         gnuplot.output_plot(headers, rows, plotpath, gnuplot_script,
                             title, specs, style, plot.page,
-                            plot_axes.get(variable, '<unknown variable>'))
+                            axes_label)
 
         
-
         import textualtable
-        debugdata.write(textualtable.make_textual_table(headers, rows))
+        metadata_file.write("\n\n{0} (Page {1})\n\n".format(title, plot.page))
+
+        keyvalpairs = series.values()[0].values()[0]['fixed'].items() + [
+            ('variable', axes_label),
+            ('measure', measure),
+            ('grouping', group)]
+        
+        for k,v in keyvalpairs:
+             if v != None:
+                 metadata_file.write("{k:<25} {v}\n".format(k=k, v=v))
+
+        metadata_file.write("\n" + textualtable.make_textual_table(headers, rows))
 
 plot.page = 0
 
@@ -249,16 +261,16 @@ def make_table(series, group, variable, measure):
         row = []
         row.append(v)
         for key, grp in series.iteritems():
-            row.append(grp.get(v, {}).get(measure, -500))
+            row.append(grp.get(v, {}).get(measure, None))
         rows.append(row)
 
     if variable == 'id':
-        rows = sorted(rows, key=lambda x:int(x[2]))
+        rows = sorted(rows, key=lambda x:x[1] or -1)
 
     return headers, rows
     
 
-def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
+def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file):
     gnuplot.init(gnuplotcommands, output, bid)
 
     #all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
@@ -273,7 +285,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
     defaults = [benchmarks, gnuplotcommands, plotpath]
 
     plot(
-        custom_benchmarks, gnuplotcommands, plotpath,
+        custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
         style = 'simple_groups',
         title = 'Measuring overhead',
         keys_to_remove = [],
@@ -285,7 +297,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
 
     for i, ptype in enumerate(types):
         plot(
-            benchmarks, gnuplotcommands, plotpath,
+            benchmarks, gnuplotcommands, plotpath, metadata_file,
             title = ptype,
             style = 'simple_groups',
             keys_to_remove = keys_to_remove + ['dynamic_size'],
@@ -298,7 +310,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
 
     for direction in directions:
         plot(
-            benchmarks, gnuplotcommands, plotpath,
+            benchmarks, gnuplotcommands, plotpath, metadata_file,
             title = 'Dynamic size: parameters, direction ' + direction,
             style = 'simple_groups',
             keys_to_remove = type_counts,
@@ -314,7 +326,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
 
     for direction in directions:
         plot(
-            benchmarks, gnuplotcommands, plotpath,
+            benchmarks, gnuplotcommands, plotpath, metadata_file,
             title = 'Dynamic size: return types, direction ' + direction,
             style = 'simple_groups',
             keys_to_remove = type_counts,
@@ -333,7 +345,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
 
     for direction in directions:
         plot(
-            benchmarks, gnuplotcommands, plotpath,
+            benchmarks, gnuplotcommands, plotpath, metadata_file,
             style = 'simple_groups',
             title = 'Type grouping ' + direction,
             keys_to_remove = keys_to_remove,
@@ -345,7 +357,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
     
 
     plot(
-        benchmarks, gnuplotcommands, plotpath,
+        benchmarks, gnuplotcommands, plotpath, metadata_file,
         style = 'named_columns',
         title = 'Return types',
         keys_to_remove = ['has_reference_types', 'dynamic_variation'],
@@ -360,7 +372,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
 
     for direction in directions:
         plot(
-            custom_benchmarks, gnuplotcommands, plotpath,
+            custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style = 'simple_groups',
             title = 'Custom, dynamic ' + direction,
             select_predicate = (
@@ -372,7 +384,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
             variable = 'dynamic_size')
 
     plot(
-        custom_benchmarks, gnuplotcommands, plotpath,
+        custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
         style = 'histogram',
         title = 'Custom, non-dynamic',
         select_predicate = (
@@ -507,7 +519,7 @@ if __name__ == '__main__':
     metadata_f.write("measurements: {0}\n".format(" ".join(ids)))
 
     preprocess_benchmarks(benchmarks, global_values)
-    plot_benchmarks(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id)
+    plot_benchmarks(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id, metadata_f)
 
     plotfile.flush()
     plotfile.close()

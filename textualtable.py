@@ -13,7 +13,7 @@ def make_textual_table(headers, rows):
             if max_widths[i] < l:
                 max_widths[i] = l
                         
-    row_format = ["{{:>{w}}}".format(w=w+3) for w in max_widths]
+    row_format = ["{{:>{w}}}   ".format(w=w) for w in max_widths]
     row_format = "".join(row_format) + "\n"
 
     result += row_format.format(*headers)
