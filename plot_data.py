@@ -12,41 +12,28 @@ from subprocess import call
 import shutil
 import uuid
 
+from jni_types import primitive_type_definitions, object_type_definitions, array_types
+
+primitive_types = [t['java']
+                   for t in primitive_type_definitions]
+
+reference_types = ['{p}.{t}'.format(p=t['package'], t=t['java'])
+                   for t in object_type_definitions + array_types.values()
+                   if t.get('package')]
+
+reference_types += [t['java']
+                    for t in array_types.itervalues()
+                    if not t.get('package')]
+
 pp = pprint.PrettyPrinter(depth=10, indent=4)
+
 debugdata = open('/tmp/debug.txt', 'w')
-
-reference_types = [
-    'boolean[]',
-    'byte[]',
-    'char[]',
-    'double[]',
-    'float[]',
-    'int[]',
-    'long[]',
-    'short[]',
-    'java.lang.Object[]',
-    'java.lang.Class',
-    'java.lang.Object',
-    'java.lang.String',
-    'java.lang.Throwable'
-    ]
-
-primitive_types = [
-    'boolean',
-    'byte',
-    'char',
-    'double',
-    'float',
-    'int',
-    'long',
-    'short'
-    ]
 
 directions = [
     "%s > %s" % (fr, to) for fr, to in
     [('C', 'J'), ('J', 'C'), ('J', 'J'), ('C','C')]]
 
-types = reference_types[:] + primitive_types
+types = reference_types + primitive_types
 
 SEPARATOR = ','
 NUMERICAL = '-?[0-9]+'
@@ -400,6 +387,17 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
 
     defaults = [benchmarks, gnuplotcommands, plotpath]
 
+    plot(
+        custom_benchmarks, gnuplotcommands, plotpath,
+        template = plot_simple_groups,
+        title = 'Measuring overhead',
+        keys_to_remove = [],
+        select_predicate = (
+            lambda x: 'Overhead' in x['id']),
+        group = 'direction',
+        measure = 'response_time_millis',
+        variable = 'description')
+
     for i, ptype in enumerate(types):
         plot(
             benchmarks, gnuplotcommands, plotpath,
@@ -474,17 +472,6 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid):
         variable = 'direction',
         min_series_width = 2)
     # had: sort 'response_time_millis', min_series_width: 2 , unused?
-
-    plot(
-        custom_benchmarks, gnuplotcommands, plotpath,
-        template = plot_simple_groups,
-        title = 'Measuring overhead',
-        keys_to_remove = [],
-        select_predicate = (
-            lambda x: 'Overhead' in x['id']),
-        group = 'direction',
-        measure = 'response_time_millis',
-        variable = 'description')
 
     for direction in directions:
         plot(
