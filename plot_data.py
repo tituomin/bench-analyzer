@@ -15,6 +15,8 @@ import numpy
 
 from jni_types import primitive_type_definitions, object_type_definitions, array_types
 from datafiles import read_datafiles, read_measurement_metadata
+import analysis
+from analysis import linear_fit
 import gnuplot
 
 primitive_types = [
@@ -243,18 +245,23 @@ def plot(
 
         metadata_file.write("\n" + textualtable.make_textual_table(headers, rows))
 
-
         if variable != 'direction' and variable != 'id':
+            x, polys, residuals = linear_fit(rows)
 
-            from analysis import linear_fit
-            columns = numpy.reshape(rows, len(rows)*len(headers), order='F').reshape((len(headers), -1))
+            fitted_curves = []
+            for i, xval in enumerate(x):
+                current = [xval]
+                current.extend(rows[i][1:])
+                current.extend([numpy.polyval(polys[j], xval) for j in range(0, len(rows[i]) - 1)])
+                fitted_curves.append(current)
 
-            x = columns[0]
-            columns = columns[1:]
-
-            residuals = [linear_fit(x, col)[1][0] for col in columns]
+            plot.page += 1
+            gnuplot.output_plot(
+                headers + headers[1:], fitted_curves, plotpath, gnuplot_script,
+                title, specs, 'fitted_lines', plot.page, axes_label)
 
             metadata_file.write("\nresiduals:\n" + textualtable.make_textual_table(headers[1:], [residuals]))
+    return data
 
 plot.page = 0
 
@@ -299,7 +306,9 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
 
     defaults = [benchmarks, gnuplotcommands, plotpath]
 
-    plot(
+#    analysis.calculate_overheads()
+
+    overhead_data = plot(
         custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
         style = 'simple_groups',
         title = 'Measuring overhead',
@@ -309,6 +318,14 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
         group = 'direction',
         measure = 'response_time_millis',
         variable = 'description')
+
+    for series in overhead_data:
+        loop_id = series.itervalues().next().itervalues().next()['info']['id']
+
+        if 'AllocOverhead' in loop_id:
+            pass
+        elif 'NormalOverhead' in loop_id:
+            pass
 
     for i, ptype in enumerate(types):
         plot(

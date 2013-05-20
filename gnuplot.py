@@ -14,11 +14,20 @@ set label 1 "{bid}" at graph 0.01, graph 1.1
 """
 
 templates = {}
+
 templates['simple_groups'] = """
 set title '{title}'
 set label 2 "page {page}" at graph 0.01, graph 1.06
 set xlabel "{xlabel}"
 plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with linespoints
+"""
+
+templates['fitted_lines'] = """
+set title '{title}'
+set label 2 "page {page}" at graph 0.01, graph 1.06
+set xlabel "{xlabel}"
+plot for [I=2:{last_real_column}] '{filename}' index {index} using 1:I title columnhead with points, \
+for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I title columnhead with lines
 """
 
 templates['named_columns'] = """
@@ -59,9 +68,18 @@ def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, sty
     if miny == None:
         miny = '*'
 
-    plotscript.write(template.format(
-       title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
-       xlabel = xlabel, miny=miny))
+    if style == 'fitted_lines':
+        length = len(data_headers) - 1
+        last_real_column = 1 + length / 2
+        first_fitted_column = last_real_column + 1
+        plotscript.write(template.format(
+           title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
+           xlabel = xlabel, miny=miny, last_real_column=last_real_column, first_fitted_column=first_fitted_column))
+
+    else:
+        plotscript.write(template.format(
+           title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
+           xlabel = xlabel, miny=miny))
     
 
 def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None):
