@@ -11,6 +11,8 @@ import os
 import shutil
 import uuid
 
+import numpy
+
 from jni_types import primitive_type_definitions, object_type_definitions, array_types
 from datafiles import read_datafiles, read_measurement_metadata
 import gnuplot
@@ -218,15 +220,15 @@ def plot(
             continue
 
         plot.page += 1
-
         axes_label = plot_axes.get(variable, '<unknown variable>')
 
-        headers, rows = make_table(series, group, variable, measure)
-        gnuplot.output_plot(headers, rows, plotpath, gnuplot_script,
-                            title, specs, style, plot.page,
-                            axes_label)
+        headers, rows = make_table(
+            series, group, variable, measure, axes_label)
 
-        
+        gnuplot.output_plot(
+            headers, rows, plotpath, gnuplot_script,
+            title, specs, style, plot.page, axes_label)
+
         import textualtable
         metadata_file.write("\n\n{0} (Page {1})\n\n".format(title, plot.page))
 
@@ -234,16 +236,29 @@ def plot(
             ('variable', axes_label),
             ('measure', measure),
             ('grouping', group)]
-        
+
         for k,v in keyvalpairs:
              if v != None:
                  metadata_file.write("{k:<25} {v}\n".format(k=k, v=v))
 
         metadata_file.write("\n" + textualtable.make_textual_table(headers, rows))
 
+
+        if variable != 'direction' and variable != 'id':
+
+            from analysis import linear_fit
+            columns = numpy.reshape(rows, len(rows)*len(headers), order='F').reshape((len(headers), -1))
+
+            x = columns[0]
+            columns = columns[1:]
+
+            residuals = [linear_fit(x, col)[1][0] for col in columns]
+
+            metadata_file.write("\nresiduals:\n" + textualtable.make_textual_table(headers[1:], [residuals]))
+
 plot.page = 0
 
-def make_table(series, group, variable, measure):
+def make_table(series, group, variable, measure, axes_label):
     all_benchmark_variables_set = set()
     for bm_list in series.itervalues():
         all_benchmark_variables_set.update(bm_list.keys())
@@ -253,7 +268,7 @@ def make_table(series, group, variable, measure):
     rows = []
 
     headers = (
-        [plot_axes.get(variable, '<unknown variable>')] +
+        [axes_label] +
         [k for k in series.iterkeys()]
     )
     

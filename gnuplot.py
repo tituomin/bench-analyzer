@@ -38,7 +38,7 @@ set xtics rotate
 set style data histograms
 set style histogram clustered
 set style fill solid 1.0 border lt -1
-plot for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title columnhead with histogram
+plot [] [{miny}:*] for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title columnhead with histogram
 """
 
 def init(plotscript, filename, measurement_id):
@@ -51,9 +51,17 @@ def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, sty
     plotdata = open(filename, 'w')
     plotdata.write(print_benchmarks(data_headers, data_rows, title, **specs))
 
+    miny = 0
+    for row in data_rows:
+        for cell in row[1:]:
+            if cell < miny:
+                miny = cell
+    if miny == None:
+        miny = '*'
+
     plotscript.write(template.format(
        title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
-       xlabel = xlabel))
+       xlabel = xlabel, miny=miny))
     
 
 def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None):
