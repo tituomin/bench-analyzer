@@ -16,7 +16,7 @@ import numpy
 from jni_types import primitive_type_definitions, object_type_definitions, array_types
 from datafiles import read_datafiles, read_measurement_metadata
 import analysis
-from analysis import linear_fit
+from analysis import linear_fit, estimate_measuring_overhead
 import gnuplot
 
 primitive_types = [
@@ -308,24 +308,28 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
 
 #    analysis.calculate_overheads()
 
-    overhead_data = plot(
-        custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
-        style = 'simple_groups',
-        title = 'Measuring overhead',
-        keys_to_remove = [],
-        select_predicate = (
-            lambda x: 'Overhead' in x['id']),
-        group = 'direction',
-        measure = 'response_time_millis',
-        variable = 'description')
+    for loop_type in ['AllocOverhead', 'NormalOverhead']:
 
-    for series in overhead_data:
-        loop_id = series.itervalues().next().itervalues().next()['info']['id']
+        overhead_data = plot(
+            custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
+            style = 'simple_groups',
+            title = 'Measuring overhead',
+            keys_to_remove = [],
+            select_predicate = (
+                lambda x: loop_type in x['id']),
+            group = 'direction',
+            measure = 'response_time_millis',
+            variable = 'description')
 
-        if 'AllocOverhead' in loop_id:
-            pass
-        elif 'NormalOverhead' in loop_id:
-            pass
+        if len(overhead_data) > 1:
+            print 'Error, more loop types than expected.', len(overhead_data)
+            exit(1)
+
+        series = overhead_data[0]
+        headers, rows = make_table(
+            series, 'direction', 'description', 'response_time_millis', 'workload')
+        est = estimate_measuring_overhead(rows)
+        print loop_type, est
 
     for i, ptype in enumerate(types):
         plot(
@@ -489,11 +493,13 @@ if __name__ == '__main__':
     [{idx}]:     total measurements: {num}
                     repetitions: {reps}
                        checksum: {ck}
+                       revision: {rev}
                            tool: {tool}
                           dates: {first} -
                                  {last}
     """.format(num=len(m), idx=i, reps=m[0].get('repetitions'),
                ck=m[0].get('code-checksum'),
+               rev=m[0].get('code-revision'),
                tool=m[0].get('tool'),
                first=m[0]['start'], last=m[-1]['end'])
 
