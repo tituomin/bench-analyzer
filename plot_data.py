@@ -25,15 +25,8 @@ primitive_types = [
 ]
 
 reference_types = [
-    '{p}.{t}'.format(p=t['package'], t=t['java'])
-    for t in object_type_definitions + array_types.values()
-    if t.get('package')
-]
-
-reference_types += [
     t['java']
     for t in array_types.itervalues()
-    if not t.get('package')
 ]
 
 types = reference_types + primitive_types
@@ -66,11 +59,11 @@ def add_derived_values(benchmark):
         benchmark['dynamic_variation'] = 1
 
     single_type = None
-    if (benchmark['parameter_count'] == 0):
+    if (benchmark.get('parameter_count') == 0):
         single_type = 'any'
-    elif (benchmark['parameter_type_count'] == 1):
+    elif (benchmark.get('parameter_type_count') == 1):
         for tp in types:
-            if benchmark['parameter_type_{t}_count'.format(t=tp)] != None:
+            if benchmark.get('parameter_type_{t}_count'.format(t=tp)) != None:
                 single_type = tp
                 break
     benchmark['single_type'] = single_type
@@ -321,15 +314,16 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
             measure = 'response_time_millis',
             variable = 'description')
 
-        if len(overhead_data) > 1:
-            print 'Error, more loop types than expected.', len(overhead_data)
-            exit(1)
+        if overhead_data != None:
+            if len(overhead_data) > 1:
+                print 'Error, more loop types than expected.', len(overhead_data)
+                exit(1)
 
-        series = overhead_data[0]
-        headers, rows = make_table(
-            series, 'direction', 'description', 'response_time_millis', 'workload')
-        est = estimate_measuring_overhead(rows)
-        print loop_type, est
+            series = overhead_data[0]
+            headers, rows = make_table(
+                series, 'direction', 'description', 'response_time_millis', 'workload')
+            est = estimate_measuring_overhead(rows)
+            print loop_type, est
 
     for i, ptype in enumerate(types):
         plot(
