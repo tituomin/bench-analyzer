@@ -322,7 +322,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
             series = overhead_data[0]
             headers, rows = make_table(
                 series, 'direction', 'description', 'response_time_millis', 'workload')
-            est = estimate_measuring_overhead(rows)
+            est = estimate_measuring_overhead(rows[1:])
             print loop_type, est
 
     for i, ptype in enumerate(types):
@@ -408,6 +408,20 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
             select_predicate = (
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
+                           'ArrayRegion' not in x['id'] and
+                           'Overhead' not in x['id'])),
+            group = 'id',
+            measure = 'response_time_millis',
+            variable = 'dynamic_size')
+
+        plot(
+            custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
+            style = 'simple_groups',
+            title = 'Custom, dynamic ' + direction,
+            select_predicate = (
+                lambda x: (x['direction'] == direction and
+                           x['dynamic_variation'] == 1 and
+                           'ArrayRegion' in x['id'] and
                            'Overhead' not in x['id'])),
             group = 'id',
             measure = 'response_time_millis',
@@ -489,12 +503,16 @@ if __name__ == '__main__':
                        checksum: {ck}
                        revision: {rev}
                            tool: {tool}
+                            cpu: {freq} KHz
+                            set: {bset}
                           dates: {first} -
                                  {last}
     """.format(num=len(m), idx=i, reps=m[0].get('repetitions'),
                ck=m[0].get('code-checksum'),
                rev=m[0].get('code-revision'),
                tool=m[0].get('tool'),
+               freq=m[0].get('cpu-freq'),
+               bset=m[0].get('benchmark-set'),
                first=m[0]['start'], last=m[-1]['end'])
 
             i += 1
