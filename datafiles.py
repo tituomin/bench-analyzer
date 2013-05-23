@@ -104,8 +104,9 @@ def read_measurement_metadata(mfile):
                 tool = measurement.get('tool')
                 cpufreq = measurement.get('cpu-freq')
                 benchmark_set = measurement.get('benchmark-set')
+                substring_filter = measurement.get('substring-filter')
                 if revision and repetitions:
-                        key = (revision, checksum, repetitions, tool, cpufreq, benchmark_set)
+                        key = (revision, checksum, repetitions, tool, cpufreq, benchmark_set, substring_filter)
                         if key not in compatibles:
                             compatibles[key] = []
                         compatibles[key].append(measurement)

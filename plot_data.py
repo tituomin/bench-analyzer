@@ -81,10 +81,12 @@ def extract_data(benchmarks,
                  min_series_length=2, sort=None, min_series_width=None):
 
     # info == extra metadata not to be analyzed
-    info = ['no', 'description']
+    info = ['no']
 
     if 'class' in benchmarks[0]:
         info.append('class')
+    if 'description' in benchmarks[0]:
+        info.append('description')
     if re.match('parameter_type_.+count', variable):
         info.append('parameter_count')
     if variable != 'id':
@@ -155,6 +157,7 @@ def aggregate_measurements(benchmarks, measure, stat_fun=min):
     benchmark = None
     for benchmark in benchmarks:
         values.append(benchmark[measure])
+
 
     benchmark[measure] = stat_fun(values)
 
@@ -300,30 +303,32 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
     defaults = [benchmarks, gnuplotcommands, plotpath]
 
 #    analysis.calculate_overheads()
-
+    overhead_estimates = {}
     for loop_type in ['AllocOverhead', 'NormalOverhead']:
+        for direction in ['C > J', 'J > J']:
+            overhead_estimates[direction] = {}
+            overhead_data = plot(
+                custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
+                style = 'simple_groups',
+                title = 'Measuring overhead',
+                keys_to_remove = [],
+                select_predicate = (
+                    lambda x: x['direction'] == direction and loop_type in x['id']),
+                group = 'direction',
+                measure = 'response_time_millis',
+                variable = 'description')
 
-        overhead_data = plot(
-            custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
-            style = 'simple_groups',
-            title = 'Measuring overhead',
-            keys_to_remove = [],
-            select_predicate = (
-                lambda x: loop_type in x['id']),
-            group = 'direction',
-            measure = 'response_time_millis',
-            variable = 'description')
+            if overhead_data != None:
+                if len(overhead_data) > 1:
+                    print 'Error, more loop types than expected.', len(overhead_data)
+                    exit(1)
 
-        if overhead_data != None:
-            if len(overhead_data) > 1:
-                print 'Error, more loop types than expected.', len(overhead_data)
-                exit(1)
-
-            series = overhead_data[0]
-            headers, rows = make_table(
-                series, 'direction', 'description', 'response_time_millis', 'workload')
-            est = estimate_measuring_overhead(rows[1:])
-            print loop_type, est
+                series = overhead_data[0]
+                headers, rows = make_table(
+                    series, 'direction', 'description', 'response_time_millis', 'workload')
+                est = estimate_measuring_overhead(rows[1:])
+                overhead_estimates[direction][loop_type] = est[0]
+                metadata_file.write('Overhead ' + direction + ' ' + str(est[0]))
 
     for i, ptype in enumerate(types):
         plot(
@@ -497,7 +502,8 @@ if __name__ == '__main__':
                                   measurements.values())
 
     for m in limited_measurements:
-            print """
+        b = m[0]
+        print """
     [{idx}]:     total measurements: {num}
                     repetitions: {reps}
                        checksum: {ck}
@@ -505,17 +511,24 @@ if __name__ == '__main__':
                            tool: {tool}
                             cpu: {freq} KHz
                             set: {bset}
+                         filter: {sfilter}
                           dates: {first} -
                                  {last}
-    """.format(num=len(m), idx=i, reps=m[0].get('repetitions'),
-               ck=m[0].get('code-checksum'),
-               rev=m[0].get('code-revision'),
-               tool=m[0].get('tool'),
-               freq=m[0].get('cpu-freq'),
-               bset=m[0].get('benchmark-set'),
-               first=m[0]['start'], last=m[-1]['end'])
-
-            i += 1
+    """.format(
+        num     = len(m),
+        idx     = i,
+        last    = m[-1]['end'],
+        reps    = b.get('repetitions'),
+        ck      = b.get('code-checksum'),
+        rev     = b.get('code-revision'),
+        tool    = b.get('tool'),
+        freq    = b.get('cpu-freq'),
+        bset    = b.get('benchmark-set'),
+        sfilter = b.get('substring-filter'),
+        first   = b.get('start')
+        )
+ 
+        i += 1
 
     try:
         response = raw_input("Choose set 1-{last} >> ".format(last=i-1))
