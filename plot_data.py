@@ -66,6 +66,8 @@ def add_derived_values(benchmark):
             if benchmark.get('parameter_type_{t}_count'.format(t=tp)) != None:
                 single_type = tp
                 break
+    benchmark['direction'] = '{f} > {t}'.format(f=benchmark['from'],
+                                                t=benchmark['to'])
     benchmark['single_type'] = single_type
 
 def add_global_values(benchmark, global_values):
@@ -81,7 +83,7 @@ def extract_data(benchmarks,
                  min_series_length=2, sort=None, min_series_width=None):
 
     # info == extra metadata not to be analyzed
-    info = ['no']
+    info = ['no', 'from', 'to']
 
     if 'class' in benchmarks[0]:
         info.append('class')
@@ -305,16 +307,16 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
 #    analysis.calculate_overheads()
     overhead_estimates = {}
     for loop_type in ['AllocOverhead', 'NormalOverhead']:
-        for direction in ['C > J', 'J > J']:
-            overhead_estimates[direction] = {}
+        for from_lang in ['C', 'J']:
+            overhead_estimates[from_lang] = {}
             overhead_data = plot(
                 custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
                 style = 'simple_groups',
                 title = 'Measuring overhead',
                 keys_to_remove = [],
                 select_predicate = (
-                    lambda x: x['direction'] == direction and loop_type in x['id']),
-                group = 'direction',
+                    lambda x: x['from'] == from_lang and loop_type in x['id']),
+                group = 'from',
                 measure = 'response_time_millis',
                 variable = 'description')
 
@@ -325,10 +327,10 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
 
                 series = overhead_data[0]
                 headers, rows = make_table(
-                    series, 'direction', 'description', 'response_time_millis', 'workload')
+                    series, 'from', 'description', 'response_time_millis', 'workload')
                 est = estimate_measuring_overhead(rows[1:])
-                overhead_estimates[direction][loop_type] = est[0]
-                metadata_file.write('Overhead ' + direction + ' ' + str(est[0]))
+                overhead_estimates[from_lang][loop_type] = est[0]
+                metadata_file.write('Overhead ' + from_lang + ' ' + str(est[0]))
 
     for i, ptype in enumerate(types):
         plot(
