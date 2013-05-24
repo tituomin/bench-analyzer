@@ -113,10 +113,10 @@ def read_measurement_metadata(mfile):
             measurement = {}
 
         if line != None:
-            splitted = line.split(': ')
+            splitted = line.split()
             if len(splitted) > 1:
-                key = splitted[0]
-                val = splitted[1]
+                key = splitted[0].rstrip(':')
+                val = ' '.join(splitted[1:])
                 measurement[key] = val.strip()
 
         line = mfile.readline()        
