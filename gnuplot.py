@@ -18,7 +18,7 @@ templates = {}
 templates['binned'] = """
 set title '{title}
 set label 2 "page {page}" at graph 0.01, graph 1.06
-binwidth=0.5
+binwidth=1000000
 set boxwidth binwidth
 set style fill solid 1.0 border lt -1
 bin(x,width)=width*floor(x/width) + width/2.0

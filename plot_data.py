@@ -52,6 +52,11 @@ def preprocess_benchmarks(benchmarks, global_values):
         add_global_values(b, global_values)
 
 def add_derived_values(benchmark):
+    # migration - todo - remove
+    if benchmark.get('response_time_millis') != None:
+        benchmark['response_time'] = benchmark.get('response_time_millis')
+        benchmark['time_unit'] = 'milliseconds'
+        del benchmark['response_time_millis']
     if benchmark.get('dynamic_size') == None:
         benchmark['dynamic_variation'] = 0
         benchmark['dynamic_size'] = 0
@@ -291,7 +296,7 @@ def make_table(series, group, variable, measure, axes_label):
     
 def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file):
     gnuplot.init(gnuplotcommands, output, bid)
-    measure = 'response_time_millis'
+    measure = 'response_time'
     keyset = set(all_benchmarks[0].keys()) - set([measure])
     comparison_function = functools.partial(comp_function, keyset)
     sorted_benchmarks = sorted(all_benchmarks, cmp=comparison_function)
@@ -328,7 +333,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 select_predicate = (
                     lambda x: x['from'] == from_lang and loop_type in x['id']),
                 group = 'from',
-                measure = 'response_time_millis',
+                measure = 'response_time',
                 variable = 'description')
 
             if overhead_data != None:
@@ -338,7 +343,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
 
                 series = overhead_data[0]
                 headers, rows = make_table(
-                    series, 'from', 'description', 'response_time_millis', 'workload')
+                    series, 'from', 'description', 'response_time', 'workload')
                 est = estimate_measuring_overhead(rows[1:])
                 overhead_estimates[from_lang][loop_type] = est[0]
                 metadata_file.write('Overhead ' + from_lang + ' ' + str(est[0]))
@@ -354,7 +359,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 x['dynamic_size'] == 0),
             group = 'direction',
             variable = 'parameter_count',
-            measure = 'response_time_millis')
+            measure = 'response_time')
 
     for direction in directions:
         plot(
@@ -370,7 +375,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                     x['parameter_count'] == 1)),
             group = 'single_type',
             variable = 'dynamic_size',
-            measure = 'response_time_millis')
+            measure = 'response_time')
 
     for direction in directions:
         plot(
@@ -384,7 +389,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 and x['return_type'] != 'void'),
             group = 'return_type',
             variable = 'dynamic_size',
-            measure = 'response_time_millis')
+            measure = 'response_time')
 
 
     keys_to_remove = type_counts[:]
@@ -401,7 +406,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 lambda x: x['direction'] == direction),
             group = 'single_type',
             variable = 'parameter_count',
-            measure = 'response_time_millis')
+            measure = 'response_time')
     
 
     plot(
@@ -413,10 +418,10 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
             lambda x: x['dynamic_size'] == 0 and
             x['return_type'] != 'void'),
         group = 'return_type',
-        measure = 'response_time_millis',
+        measure = 'response_time',
         variable = 'direction',
         min_series_width = 2)
-    # had: sort 'response_time_millis', min_series_width: 2 , unused?
+    # had: sort 'response_time', min_series_width: 2 , unused?
 
     for direction in directions:
         plot(
@@ -429,7 +434,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                            'ArrayRegion' not in x['id'] and
                            'Overhead' not in x['id'])),
             group = 'id',
-            measure = 'response_time_millis',
+            measure = 'response_time',
             variable = 'dynamic_size')
 
         plot(
@@ -442,7 +447,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                            'ArrayRegion' in x['id'] and
                            'Overhead' not in x['id'])),
             group = 'id',
-            measure = 'response_time_millis',
+            measure = 'response_time',
             variable = 'dynamic_size')
 
     plot(
@@ -454,7 +459,7 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 x['dynamic_variation'] == 0 and
                 'Overhead' not in x['id'])),
         group = 'direction',
-        measure = 'response_time_millis',
+        measure = 'response_time',
         variable = 'id')
 
         
@@ -534,7 +539,7 @@ if __name__ == '__main__':
         num     = len(m),
         idx     = i,
         last    = m[-1]['end'],
-        rounds  = b.get('rounds'),
+        rounds  = reduce(lambda x,y: y+x, [int(b['rounds']) for b in m]),
         reps    = b.get('repetitions'),
         ck      = b.get('code-checksum'),
         rev     = b.get('code-revision'),
@@ -607,7 +612,6 @@ if __name__ == '__main__':
     if 'curves' in method:
         function = plot_benchmarks
     elif 'distributions' in method:
-        print 'here'
         function = plot_distributions
 
     function(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id, metadata_f)
