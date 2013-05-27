@@ -15,6 +15,16 @@ set label 1 "{bid}" at graph 0.01, graph 1.1
 
 templates = {}
 
+templates['binned'] = """
+set title '{title}
+set label 2 "page {page}" at graph 0.01, graph 1.06
+binwidth=0.5
+set boxwidth binwidth
+set style fill solid 1.0 border lt -1
+bin(x,width)=width*floor(x/width) + width/2.0
+plot '{filename}' using (bin($1,binwidth)):(1.0) smooth freq with boxes
+"""
+
 templates['simple_groups'] = """
 set title '{title}'
 set label 2 "page {page}" at graph 0.01, graph 1.06
@@ -84,8 +94,9 @@ def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, sty
 
 def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None):
     result = '#{0}\n'.format(title)
-    result = '#measure:{m} variable:{v} group:{g}'.format(
-        m=measure, v=variable, g=group)
+    if group and variable and measure:
+        result = '#measure:{m} variable:{v} group:{g}'.format(
+            m=measure, v=variable, g=group)
 
     result = " ".join([format_value(k) for k in data_headers])
     result += '\n'
