@@ -52,7 +52,7 @@ def preprocess_benchmarks(benchmarks, global_values):
         add_global_values(b, global_values)
 
 def add_derived_values(benchmark):
-    if benchmark['dynamic_size'] == None:
+    if benchmark.get('dynamic_size') == None:
         benchmark['dynamic_variation'] = 0
         benchmark['dynamic_size'] = 0
     else:
@@ -289,6 +289,17 @@ def make_table(series, group, variable, measure, axes_label):
 
     return headers, rows
     
+def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file):
+    gnuplot.init(gnuplotcommands, output, bid)
+    measure = 'response_time_millis'
+    keyset = set(all_benchmarks[0].keys()) - set([measure])
+    comparison_function = functools.partial(comp_function, keyset)
+    sorted_benchmarks = sorted(all_benchmarks, cmp=comparison_function)
+    for group in group_by_keys(sorted_benchmarks, keyset):
+        gnuplot.output_plot(
+            [''], [[b[measure]] for b in group], plotpath, gnuplotcommands, group[0]['id'] + group[0]['direction'], {},
+            'binned', 1, 'foo'
+            )
 
 def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file):
     gnuplot.init(gnuplotcommands, output, bid)
@@ -478,9 +489,11 @@ def sync_measurements(dev_path, host_path, filename, update=True):
 
 if __name__ == '__main__':
     if len(argv) < 4 or len(argv) > 5:
-        print "\n    Usage: python plot_data.py input_path output_path limit [pdfviewer]\n"
+        print argv[0]
+        print "\n    Usage: python {curves OR distributions} input_path output_path limit [pdfviewer]\n"
         exit(1)
 
+    method = argv[0]
     measurement_path = argv[1]
     output_path = argv[2]
     limit = argv[3]
@@ -507,19 +520,21 @@ if __name__ == '__main__':
         b = m[0]
         print """
     [{idx}]:     total measurements: {num}
-                    repetitions: {reps}
-                       checksum: {ck}
-                       revision: {rev}
-                           tool: {tool}
-                            cpu: {freq} KHz
-                            set: {bset}
-                         filter: {sfilter}
-                          dates: {first} -
-                                 {last}
+                     repetitions: {reps}
+                          rounds: {rounds}
+                        checksum: {ck}
+                        revision: {rev}
+                            tool: {tool}
+                             cpu: {freq} KHz
+                             set: {bset}
+                          filter: {sfilter}
+                           dates: {first} -
+                                  {last}
     """.format(
         num     = len(m),
         idx     = i,
         last    = m[-1]['end'],
+        rounds  = b.get('rounds'),
         reps    = b.get('repetitions'),
         ck      = b.get('code-checksum'),
         rev     = b.get('code-revision'),
@@ -542,14 +557,16 @@ if __name__ == '__main__':
 
     filenames = []
     ids = []
+    multiplier = 0
     for measurement in benchmark_group:
-        if measurement['tool'] == TOOL_NAMESPACE + '.LinuxPerfRecordTool':
+        if 'LinuxPerfRecordTool' in measurement['tool']:
             basename = "perfdata-{n}.zip"
         else:
             basename = "benchmarks-{n}.csv"
         filenames.append(
             basename.format(n=measurement['id']))
         ids.append(measurement['id'])
+        multiplier += int(measurement['rounds'])
 
     files = []
     for filename in filenames:
@@ -560,11 +577,11 @@ if __name__ == '__main__':
 
     global_values = {
         'repetitions': first_measurement['repetitions'],
-        'multiplier' : len(benchmark_group)
+        'multiplier' : multiplier
         }
 
     try:
-        if first_measurement['tool'] == TOOL_NAMESPACE + '.LinuxPerfRecordTool':
+        if 'LinuxPerfRecordTool' in first_measurement['tool']:
             print 'Nothing to be done for perf data. Exiting.'
             exit(0)
         benchmarks = read_datafiles(files)
@@ -576,15 +593,24 @@ if __name__ == '__main__':
 #    pp.pprint(benchmarks)
 
     benchmark_group_id = str(uuid.uuid4())
-    pdffilename = os.path.join(output_path, 'plot-{0}.pdf'.format(benchmark_group_id))
-    plotfilename = 'plot-{0}.gp'.format(benchmark_group_id)
+    plot_prefix = 'plot-{0}'.format(benchmark_group_id)
+    pdffilename = os.path.join(output_path, plot_prefix + '.pdf')
+    plotfilename = plot_prefix + '.gp'
     plotfile = open(os.path.join(output_path, plotfilename), 'w')
-    metadata_f = open(os.path.join(output_path, 'plot-{0}-metadata.txt'.format(benchmark_group_id)), 'w')
+    metadata_f = open(os.path.join(output_path, plot_prefix + '-metadata.txt'), 'w')
     metadata_f.write("id: {0}\n".format(benchmark_group_id))
     metadata_f.write("measurements: {0}\n".format(" ".join(ids)))
 
     preprocess_benchmarks(benchmarks, global_values)
-    plot_benchmarks(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id, metadata_f)
+
+    print method
+    if 'curves' in method:
+        function = plot_benchmarks
+    elif 'distributions' in method:
+        print 'here'
+        function = plot_distributions
+
+    function(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id, metadata_f)
 
     plotfile.flush()
     plotfile.close()
