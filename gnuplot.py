@@ -18,11 +18,12 @@ templates = {}
 templates['binned'] = """
 set title '{title}
 set label 2 "page {page}" at graph 0.01, graph 1.06
-binwidth=1000000
+binwidth={binwidth}
 set boxwidth binwidth
-set style fill solid 1.0 border lt -1
+set style fill solid 1.0
+# border lt -1
 bin(x,width)=width*floor(x/width) + width/2.0
-plot '{filename}' using (bin($1,binwidth)):(1.0) smooth freq with boxes
+plot '{filename}' using (bin($1,binwidth)):(1.0) notitle smooth freq with boxes lt rgb "dark-olivegreen"
 """
 
 templates['simple_groups'] = """
@@ -64,7 +65,7 @@ def init(plotscript, filename, measurement_id):
     plotscript.write(init_plots_gp.format(filename=filename, bid=measurement_id))
 
 
-def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, style, page, xlabel):
+def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, style, page, xlabel, additional_data=None):
     template = templates[style]
     filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
     plotdata = open(filename, 'w')
@@ -78,7 +79,12 @@ def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, sty
     if miny == None:
         miny = '*'
 
-    if style == 'fitted_lines':
+    if style == 'binned':
+        plotscript.write(template.format(
+           title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
+           xlabel = xlabel, miny=miny, **additional_data))
+
+    elif style == 'fitted_lines':
         length = len(data_headers) - 1
         last_real_column = 1 + length / 2
         first_fitted_column = last_real_column + 1

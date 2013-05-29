@@ -301,10 +301,16 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
     comparison_function = functools.partial(comp_function, keyset)
     sorted_benchmarks = sorted(all_benchmarks, cmp=comparison_function)
     for group in group_by_keys(sorted_benchmarks, keyset):
+        values = [b[measure] for b in group]
+        value_range = max(values) - min(values)
+        resolution = len(values) / 1
+        binwidth = value_range / resolution
+        binwidth = max(1,binwidth)
+
         gnuplot.output_plot(
-            [''], [[b[measure]] for b in group], plotpath, gnuplotcommands, group[0]['id'] + group[0]['direction'], {},
-            'binned', 1, 'foo'
-            )
+            [''], [[b[measure]] for b in group],
+            plotpath, gnuplotcommands, '%s %s' % (group[0]['id'], group[0]['direction']),
+            {}, 'binned', 1, 'foo', additional_data={'binwidth': binwidth})
 
 def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file):
     gnuplot.init(gnuplotcommands, output, bid)
@@ -599,16 +605,18 @@ if __name__ == '__main__':
 
     benchmark_group_id = str(uuid.uuid4())
     plot_prefix = 'plot-{0}'.format(benchmark_group_id)
+
     pdffilename = os.path.join(output_path, plot_prefix + '.pdf')
     plotfilename = plot_prefix + '.gp'
+
     plotfile = open(os.path.join(output_path, plotfilename), 'w')
     metadata_f = open(os.path.join(output_path, plot_prefix + '-metadata.txt'), 'w')
+
     metadata_f.write("id: {0}\n".format(benchmark_group_id))
     metadata_f.write("measurements: {0}\n".format(" ".join(ids)))
 
     preprocess_benchmarks(benchmarks, global_values)
 
-    print method
     if 'curves' in method:
         function = plot_benchmarks
     elif 'distributions' in method:
