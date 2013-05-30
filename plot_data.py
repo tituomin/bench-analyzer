@@ -297,15 +297,31 @@ def make_table(series, group, variable, measure, axes_label):
 def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file):
     gnuplot.init(gnuplotcommands, output, bid)
     measure = 'response_time'
+
     keyset = set(all_benchmarks[0].keys()) - set([measure])
     comparison_function = functools.partial(comp_function, keyset)
     sorted_benchmarks = sorted(all_benchmarks, cmp=comparison_function)
+
     for group in group_by_keys(sorted_benchmarks, keyset):
+        minimum = min(values)
         values = [b[measure] for b in group]
-        value_range = max(values) - min(values)
+        value_range = max(values) - minimum
         resolution = len(values) / 1
         binwidth = value_range / resolution
         binwidth = max(1,binwidth)
+
+#        metadata_file.write(textualtable.make_textual_table(["%f - %f"]))
+        # todo here
+
+        left_bin_edges = [minimum + i * binwidth for i in range(0, len(values))]
+        bin_amounts = [0 for i in range(0, len(values))]
+        for value in values:
+            i = 0
+            while value > left_bin_edges[i]:
+                i += 1
+            bin_amounts[i - 1] += 1
+        metadata_file.write
+            
 
         gnuplot.output_plot(
             [''], [[b[measure]] for b in group],
@@ -501,7 +517,7 @@ def sync_measurements(dev_path, host_path, filename, update=True):
 if __name__ == '__main__':
     if len(argv) < 4 or len(argv) > 5:
         print argv[0]
-        print "\n    Usage: python {curves OR distributions} input_path output_path limit [pdfviewer]\n"
+        print "\n    Usage: %s input_path output_path limit [pdfviewer]\n".format(argv[0])
         exit(1)
 
     method = argv[0]
