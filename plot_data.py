@@ -88,7 +88,7 @@ def extract_data(benchmarks,
                  min_series_length=2, sort=None, min_series_width=None):
 
     # info == extra metadata not to be analyzed
-    info = ['no', 'from', 'to']
+    info = ['no', 'from', 'to', 'lineno']
 
     if 'class' in benchmarks[0]:
         info.append('class')
@@ -293,42 +293,63 @@ def make_table(series, group, variable, measure, axes_label):
         rows = sorted(rows, key=lambda x:x[1] or -1)
 
     return headers, rows
+
+def binned_value(edges, value):
+    for i, left in enumerate(edges):
+        if value <= left:
+            return edges[max(0, i-1)]
+    return edges[-1]
     
-def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file):
-    gnuplot.init(gnuplotcommands, output, bid)
+def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, animate=False):
+    output='screen'
+    gnuplot.init(gnuplotcommands, output, bid, output=output)
     measure = 'response_time'
 
-    keyset = set(all_benchmarks[0].keys()) - set([measure])
+    keyset = set(all_benchmarks[0].keys()) - set([measure, 'lineno'])
     comparison_function = functools.partial(comp_function, keyset)
     sorted_benchmarks = sorted(all_benchmarks, cmp=comparison_function)
 
     for group in group_by_keys(sorted_benchmarks, keyset):
+        values = [b[measure] for b in sorted(group, key=lambda x:x['lineno'])]
         minimum = min(values)
-        values = [b[measure] for b in group]
+        maximum = max(values)
         value_range = max(values) - minimum
         resolution = len(values) / 1
         binwidth = value_range / resolution
         binwidth = max(1,binwidth)
 
-#        metadata_file.write(textualtable.make_textual_table(["%f - %f"]))
-        # todo here
+        bin_edges = [minimum + i * binwidth for i in range(0, len(values)+1)]
 
-        left_bin_edges = [minimum + i * binwidth for i in range(0, len(values))]
-        bin_amounts = [0 for i in range(0, len(values))]
-        for value in values:
-            i = 0
-            while value > left_bin_edges[i]:
-                i += 1
-            bin_amounts[i - 1] += 1
-        metadata_file.write
-            
+        gnuplotcommands.write(
+            gnuplot.templates['binned_init'].format(
+                title='%s %s' % (group[0]['id'], group[0]['direction']),
+                binwidth=binwidth, min_x=minimum, max_x=maximum,
+                length=len(values)))
 
-        gnuplot.output_plot(
-            [''], [[b[measure]] for b in group],
-            plotpath, gnuplotcommands, '%s %s' % (group[0]['id'], group[0]['direction']),
-            {}, 'binned', 1, 'foo', additional_data={'binwidth': binwidth})
+        counts = odict()
 
-def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file):
+        animstep = 10
+        for val in values:
+            key = binned_value(bin_edges, val)
+            count = counts.get(key, 0) + 1
+            counts[key] = count
+            if animate:
+                animstep -= 1
+                if animstep == 0:
+                    animstep = 10
+                    gnuplotcommands.write(
+                        gnuplot.templates['binned_frame'].format(
+                            values = '\n'.join(['{0} {1}'.format(val + binwidth/2.0, count) for val, count in counts.iteritems()])))
+
+        if not animate:
+            gnuplotcommands.write(
+                gnuplot.templates['binned_frame'].format(
+                    values = '\n'.join(['{0} {1}'.format(val + binwidth/2.0, count) for val, count in counts.iteritems()])))
+
+
+        gnuplotcommands.write('pause -1')
+
+def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, animate=None):
     gnuplot.init(gnuplotcommands, output, bid)
 
     #all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
@@ -638,7 +659,11 @@ if __name__ == '__main__':
     elif 'distributions' in method:
         function = plot_distributions
 
-    function(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id, metadata_f)
+    animate = False
+    if pdfviewer == 'anim':
+        animate = True
+        pdfviewer = None
+    function(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id, metadata_f, animate=animate)
 
     plotfile.flush()
     plotfile.close()

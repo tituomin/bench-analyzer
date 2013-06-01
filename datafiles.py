@@ -55,6 +55,7 @@ def read_datafiles(files):
                 exit(1)
 
             benchmark = dict()
+            benchmark['lineno'] = lineno
 
             for key, string in zip(labels, exploded_line):
                 benchmark[key] = value(string, key=key)

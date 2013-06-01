@@ -3,9 +3,12 @@
 import os
 import uuid
 
-init_plots_gp = """
+init_plots_pdf = """
 set terminal pdfcairo size 32cm,18cm
 set output '{filename}'
+"""
+
+init_plots_gp = """
 set key outside
 set size 1, 0.95
 set xlabel "Number of parameters"
@@ -25,6 +28,24 @@ set style fill solid 1.0
 bin(x,width)=width*floor(x/width) + width/2.0
 plot '{filename}' using (bin($1,binwidth)):(1.0) notitle smooth freq with boxes lt rgb "dark-olivegreen"
 """
+
+templates['binned_init'] = """
+set title '{title}
+binwidth={binwidth}
+set boxwidth binwidth
+set style fill solid 1.0
+#clear
+#unset multiplot
+#set multiplot
+#set size 1, 0.95
+#set origin 0, 0
+set xrange [{min_x}:{max_x}]
+set yrange [0:1000*0.66]
+"""
+# border lt -1
+#bin(x,width)=width*floor(x/width) + width/2.0
+
+templates['binned_frame'] = "plot '-' using 1:2 notitle with boxes lt rgb \"dark-olivegreen\"\n{values}\ne\n"
 
 templates['simple_groups'] = """
 set title '{title}'
@@ -61,15 +82,21 @@ set style fill solid 1.0 border lt -1
 plot [] [{miny}:*] for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title columnhead with histogram
 """
 
-def init(plotscript, filename, measurement_id):
-    plotscript.write(init_plots_gp.format(filename=filename, bid=measurement_id))
+def init(plotscript, filename, measurement_id, output='pdf'):
+    if output == 'pdf':
+        plotscript.write(init_plots_pdf.format(filename=filename))
+    plotscript.write(init_plots_gp.format(bid=measurement_id))
 
 
 def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, style, page, xlabel, additional_data=None):
+
     template = templates[style]
-    filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
-    plotdata = open(filename, 'w')
-    plotdata.write(print_benchmarks(data_headers, data_rows, title, **specs))
+
+    if plotpath:
+        # external data
+        filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
+        plotdata = open(filename, 'w')
+        plotdata.write(print_benchmarks(data_headers, data_rows, title, **specs))
 
     miny = 0
     for row in data_rows:
@@ -96,6 +123,7 @@ def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, sty
         plotscript.write(template.format(
            title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
            xlabel = xlabel, miny=miny))
+
     
 
 def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None):
