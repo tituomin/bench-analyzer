@@ -18,29 +18,13 @@ set label 1 "{bid}" at graph 0.01, graph 1.1
 
 templates = {}
 
-templates['binned'] = """
-set title '{title}
-set label 2 "page {page}" at graph 0.01, graph 1.06
-binwidth={binwidth}
-set boxwidth binwidth
-set style fill solid 1.0
-# border lt -1
-bin(x,width)=width*floor(x/width) + width/2.0
-plot '{filename}' using (bin($1,binwidth)):(1.0) notitle smooth freq with boxes lt rgb "dark-olivegreen"
-"""
-
 templates['binned_init'] = """
 set title '{title}
 binwidth={binwidth}
 set boxwidth binwidth
 set style fill solid 1.0
-#clear
-#unset multiplot
-#set multiplot
-#set size 1, 0.95
-#set origin 0, 0
 set xrange [{min_x}:{max_x}]
-set yrange [0:1000*0.66]
+set yrange [0:{max_y}]
 """
 # border lt -1
 #bin(x,width)=width*floor(x/width) + width/2.0

@@ -318,17 +318,27 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
         binwidth = value_range / resolution
         binwidth = max(1,binwidth)
 
-        bin_edges = [minimum + i * binwidth for i in range(0, len(values)+1)]
+        svals = sorted(values)
+        percent_limit = svals[int(0.85 * (len(svals) - 1))]
+
+        bin_edges = [minimum +  i * binwidth for i in range(0, len(values)+1)]
+
+        counts = odict()
+
+        for val in values:
+            key = binned_value(bin_edges, val)
+            count = counts.get(key, 0) + 1
+            counts[key] = count
 
         gnuplotcommands.write(
             gnuplot.templates['binned_init'].format(
                 title='%s %s' % (group[0]['id'], group[0]['direction']),
-                binwidth=binwidth, min_x=minimum, max_x=maximum,
-                length=len(values)))
-
+                binwidth=binwidth, min_x=minimum, max_x=percent_limit,
+                max_y=max(counts.itervalues())))
+            
         counts = odict()
 
-        animstep = 10
+        animstep = 1000
         for val in values:
             key = binned_value(bin_edges, val)
             count = counts.get(key, 0) + 1
@@ -670,6 +680,7 @@ if __name__ == '__main__':
     call(["gnuplot", plotfile.name])
     if pdfviewer:
         call([pdfviewer, str(pdffilename)])
-    print "Final plot", str(pdffilename)
+    if not 'distributions' in method:
+        print "Final plot", str(pdffilename)
     exit(0)
     
