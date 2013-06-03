@@ -314,16 +314,29 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
         minimum = min(values)
         maximum = max(values)
         value_range = max(values) - minimum
-        resolution = len(values) / 1
-        binwidth = value_range / resolution
+#        resolution = 10000
+        binwidth = 100000
         binwidth = max(1,binwidth)
 
         svals = sorted(values)
         percent_limit = svals[int(0.85 * (len(svals) - 1))]
 
         bin_edges = [minimum +  i * binwidth for i in range(0, len(values)+1)]
-
+        value_count = len(values)
         counts = odict()
+
+        i = 0
+        for j, edge in enumerate(bin_edges[:-1]):
+            count = 0
+            while i < len(svals) and svals[i] >= edge and svals[i] <= bin_edges[j+1]:
+                count += 1
+                i += 1
+            counts[edge] = {'limit': edge, 'count': count, 'percent': 1.0 * count / value_count }
+
+        print '-----group ', group[0]['direction']
+        for val in sorted(counts.itervalues(), key=lambda x:-x['count'])[0:20]:
+            print "{0:<12} {1:<10}".format(val['limit'], val['percent'])
+        continue
 
         for val in values:
             key = binned_value(bin_edges, val)
