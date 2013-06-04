@@ -294,15 +294,14 @@ def make_table(series, group, variable, measure, axes_label):
 
     return headers, rows
 
-def binned_value(edges, value):
-    for i, left in enumerate(edges):
-        if value <= left:
-            return edges[max(0, i-1)]
-    return edges[-1]
+def binned_value(minimum, width, value):
+    return width * (int(value - minimum) / int(width)) + minimum
     
 def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, animate=False):
-    output='screen'
-    gnuplot.init(gnuplotcommands, output, bid, output=output)
+    output_type='screen'
+    if not animate:
+        output_type='pdf'
+    gnuplot.init(gnuplotcommands, output, bid, output=output_type)
     measure = 'response_time'
 
     keyset = set(all_benchmarks[0].keys()) - set([measure, 'lineno'])
@@ -310,67 +309,82 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
     sorted_benchmarks = sorted(all_benchmarks, cmp=comparison_function)
 
     for group in group_by_keys(sorted_benchmarks, keyset):
-        values = [b[measure] for b in sorted(group, key=lambda x:x['lineno'])]
+        if animate:
+            keyf=lambda x:x['lineno']
+        else:
+            keyf=lambda x:x[measure]
+        values = [b[measure] for b in sorted(group, key=keyf)]
         minimum = min(values)
         maximum = max(values)
         value_range = max(values) - minimum
+        binwidth = ((value_range / 1000000) / 10) * 10
+        min_bin = (minimum / binwidth) * binwidth
+        max_bin = (maximum / binwidth + 1) * binwidth
 #        resolution = 10000
-        binwidth = 100000
         binwidth = max(1,binwidth)
 
         svals = sorted(values)
-        percent_limit = svals[int(0.85 * (len(svals) - 1))]
+        percent_limit = svals[int(0.98 * (len(svals) - 1))]
 
-        bin_edges = [minimum +  i * binwidth for i in range(0, len(values)+1)]
         value_count = len(values)
-        counts = odict()
 
+        counts = odict()
+        max_count = 0
         i = 0
-        for j, edge in enumerate(bin_edges[:-1]):
+        for left in [x for x in range(min_bin, max_bin, binwidth)]:
             count = 0
-            while i < len(svals) and svals[i] >= edge and svals[i] <= bin_edges[j+1]:
+            while i < len(svals) and svals[i] < left + binwidth:
                 count += 1
                 i += 1
-            counts[edge] = {'limit': edge, 'count': count, 'percent': 1.0 * count / value_count }
 
-        print '-----group ', group[0]['direction']
+            max_count = max(count, max_count)
+            counts[left] = {
+                'limit': left,
+                'count': count,
+                'percent': float(count) / value_count }
+
+        metadata_file.write('Direction {0}\n'.format(group[0]['direction']))
         for val in sorted(counts.itervalues(), key=lambda x:-x['count'])[0:20]:
-            print "{0:<12} {1:<10}".format(val['limit'], val['percent'])
-        continue
-
-        for val in values:
-            key = binned_value(bin_edges, val)
-            count = counts.get(key, 0) + 1
-            counts[key] = count
+            metadata_file.write("{:<12} {:<10} {:<10}\n".format(
+                    val['limit'], val['percent'], val['count']))
+        metadata_file.write("---\n")
+        for val in sorted(counts.itervalues(), key=lambda x:x['limit']):
+            metadata_file.write("{:<12} {:<10} {:<10}\n".format(
+                    val['limit'], val['percent'], val['count']))
 
         gnuplotcommands.write(
             gnuplot.templates['binned_init'].format(
                 title='%s %s' % (group[0]['id'], group[0]['direction']),
-                binwidth=binwidth, min_x=minimum, max_x=percent_limit,
-                max_y=max(counts.itervalues())))
+                binwidth=binwidth, min_x=minimum - binwidth, max_x=percent_limit,
+                max_y=max_count))
             
         counts = odict()
 
-        animstep = 1000
+        initial_animstep = 1
+        animstep = initial_animstep
         for val in values:
-            key = binned_value(bin_edges, val)
+            key = binned_value(min_bin, binwidth, val)
             count = counts.get(key, 0) + 1
             counts[key] = count
             if animate:
                 animstep -= 1
                 if animstep == 0:
-                    animstep = 10
+                    initial_animstep += 10
+                    animstep = initial_animstep
                     gnuplotcommands.write(
                         gnuplot.templates['binned_frame'].format(
-                            values = '\n'.join(['{0} {1}'.format(val + binwidth/2.0, count) for val, count in counts.iteritems()])))
+                            values = '\n'.join(
+                                ['{} {} {}'.format(val + binwidth/2.0, count, val)
+                                 for val, count in counts.iteritems()])))
 
-        if not animate:
+        if animate:
+            gnuplotcommands.write('pause -1')
+        else:
             gnuplotcommands.write(
                 gnuplot.templates['binned_frame'].format(
-                    values = '\n'.join(['{0} {1}'.format(val + binwidth/2.0, count) for val, count in counts.iteritems()])))
+                    values = '\n'.join(['{} {} {}'.format(val + binwidth/2.0, count, val) for val, count in counts.iteritems()])))
 
 
-        gnuplotcommands.write('pause -1')
 
 def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, animate=None):
     gnuplot.init(gnuplotcommands, output, bid)
@@ -693,7 +707,7 @@ if __name__ == '__main__':
     call(["gnuplot", plotfile.name])
     if pdfviewer:
         call([pdfviewer, str(pdffilename)])
-    if not 'distributions' in method:
+    if not animate:
         print "Final plot", str(pdffilename)
     exit(0)
     
