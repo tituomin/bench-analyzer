@@ -317,7 +317,7 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
         minimum = min(values)
         maximum = max(values)
         value_range = max(values) - minimum
-        binwidth = ((value_range / 1000000) / 10) * 10
+        binwidth = max(((value_range / 10000) / 10) * 10, 100)
         min_bin = (minimum / binwidth) * binwidth
         max_bin = (maximum / binwidth + 1) * binwidth
 #        resolution = 10000
@@ -345,11 +345,11 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
 
         metadata_file.write('Direction {0}\n'.format(group[0]['direction']))
         for val in sorted(counts.itervalues(), key=lambda x:-x['count'])[0:20]:
-            metadata_file.write("{:<12} {:<10} {:<10}\n".format(
+            metadata_file.write("{:>12} {:>12} {:>12}\n".format(
                     val['limit'], val['percent'], val['count']))
         metadata_file.write("---\n")
         for val in sorted(counts.itervalues(), key=lambda x:x['limit']):
-            metadata_file.write("{:<12} {:<10} {:<10}\n".format(
+            metadata_file.write("{:>12} {:>12} {:>12}\n".format(
                     val['limit'], val['percent'], val['count']))
 
         gnuplotcommands.write(
@@ -369,7 +369,7 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
             if animate:
                 animstep -= 1
                 if animstep == 0:
-                    initial_animstep += 10
+                    #initial_animstep += 10
                     animstep = initial_animstep
                     gnuplotcommands.write(
                         gnuplot.templates['binned_frame'].format(
