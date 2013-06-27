@@ -13,7 +13,7 @@ set key outside
 set size 1, 0.95
 set xlabel "Number of parameters"
 set ylabel "Response time (ms)"
-set label 1 "{bid}" at graph 0.01, graph 1.1
+set label 1 "{bid}" at graph 0.01, graph 1.06
 """
 
 templates = {}
@@ -29,7 +29,10 @@ set yrange [0:{max_y}]
 # border lt -1
 #bin(x,width)=width*floor(x/width) + width/2.0
 
-templates['binned_frame'] = "plot '-' using 1:2 notitle with boxes lt rgb \"dark-olivegreen\"\n{values}\ne\n"
+templates['binned_frame'] = """
+#set label 2 "{datapoints}" at graph 0.8, graph 1.06
+plot '-' using 1:2 notitle with boxes lt rgb "{color}"\n{values}\ne\n
+"""
 
 templates['simple_groups'] = """
 set title '{title}'
@@ -133,3 +136,14 @@ def format_value(value):
         return '"{0}"'.format(value)
     else:
         return str(value)
+
+def hex_color_gradient(start, end, point):
+    # start, end are tuples with r,g,b values (integer)
+    # point is a point between 0 (start) and 1000 (end)
+
+    return "#" + "".join(
+        "{:0>2X}".format(
+            int(start[i] +
+                ((end[i] - start[i]) * (float(point)))))
+        for i in range(0,3))
+

@@ -297,9 +297,9 @@ def make_table(series, group, variable, measure, axes_label):
 def binned_value(minimum, width, value):
     return width * (int(value - minimum) / int(width)) + minimum
     
-def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, animate=False):
+def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None):
     output_type='screen'
-    if not animate:
+    if plot_type != 'animate':
         output_type='pdf'
     gnuplot.init(gnuplotcommands, output, bid, output=output_type)
     measure = 'response_time'
@@ -309,7 +309,7 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
     sorted_benchmarks = sorted(all_benchmarks, cmp=comparison_function)
 
     for group in group_by_keys(sorted_benchmarks, keyset):
-        if animate:
+        if plot_type != None:
             keyf=lambda x:x['lineno']
         else:
             keyf=lambda x:x[measure]
@@ -317,7 +317,7 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
         minimum = min(values)
         maximum = max(values)
         value_range = max(values) - minimum
-        binwidth = max(((value_range / 10000) / 10) * 10, 100)
+        binwidth = max((value_range / 1000000), 1)
         min_bin = (minimum / binwidth) * binwidth
         max_bin = (maximum / binwidth + 1) * binwidth
 #        resolution = 10000
@@ -360,33 +360,66 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
             
         counts = odict()
 
-        initial_animstep = 1
+        initial_animstep = 1000
         animstep = initial_animstep
-        for val in values:
+        if plot_type == 'animate':
+            gnuplotcommands.write('pause -1\n')
+
+        frames = []
+
+        for i, val in enumerate(values):
             key = binned_value(min_bin, binwidth, val)
             count = counts.get(key, 0) + 1
             counts[key] = count
-            if animate:
+            if plot_type != None:
                 animstep -= 1
                 if animstep == 0:
-                    #initial_animstep += 10
+#                    initial_animstep += 10
                     animstep = initial_animstep
-                    gnuplotcommands.write(
-                        gnuplot.templates['binned_frame'].format(
-                            values = '\n'.join(
+                    frames.append({
+                            'datapoints' : i+1,
+                            'values' : '\n'.join(
                                 ['{} {} {}'.format(val + binwidth/2.0, count, val)
-                                 for val, count in counts.iteritems()])))
+                                 for val, count in counts.iteritems()])})
 
-        if animate:
-            gnuplotcommands.write('pause -1')
-        else:
+        if plot_type == 'animate':
+            for frame in frames:
+                gnuplotcommands.write(
+                    gnuplot.templates['binned_frame'].format(
+                        datapoints = frame['datapoints'],
+                        values = frame['values'],
+                        color = "#33FF33"))
+
+        elif plot_type == 'gradient':
+            gnuplotcommands.write("set multiplot\n")
+            max_i = len(frames) - 1
+            for i in range(0, len(frames)):
+                frame = frames[max_i - i]
+                gnuplotcommands.write('set bmargin 20\n')
+                gnuplotcommands.write('set tmargin 20\n')
+                gnuplotcommands.write('set rmargin 20\n')
+                gnuplotcommands.write('set lmargin 20\n')
+                gnuplotcommands.write(
+                    gnuplot.templates['binned_frame'].format(
+                        datapoints = frame['datapoints'],
+                        values = frame['values'],
+                        color = gnuplot.hex_color_gradient((255,0,0), (0,0,255), float(i)/float(max_i))))
+                gnuplotcommands.write("unset xlabel\n")
+                gnuplotcommands.write("unset ylabel\n")
+                gnuplotcommands.write("unset label 1\n")
+                gnuplotcommands.write("unset title\n")
+
+
+#            gnuplotcommands.write('unset multiplot\n')
+
+        if plot_type == None:
             gnuplotcommands.write(
                 gnuplot.templates['binned_frame'].format(
                     values = '\n'.join(['{} {} {}'.format(val + binwidth/2.0, count, val) for val, count in counts.iteritems()])))
 
 
 
-def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, animate=None):
+def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None):
     gnuplot.init(gnuplotcommands, output, bid)
 
     #all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
@@ -698,16 +731,24 @@ if __name__ == '__main__':
 
     animate = False
     if pdfviewer == 'anim':
-        animate = True
+        plot_type = 'animate'
         pdfviewer = None
-    function(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id, metadata_f, animate=animate)
+    elif pdfviewer == 'gradient':
+        plot_type = 'gradient'
+        pdfviewer = None
+    
+    function(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id, metadata_f, plot_type=plot_type)
 
     plotfile.flush()
     plotfile.close()
+    if plot_type == 'animate':
+        print "Press enter to start animation."
     call(["gnuplot", plotfile.name])
     if pdfviewer:
         call([pdfviewer, str(pdffilename)])
-    if not animate:
-        print "Final plot", str(pdffilename)
+    print "Final plot", 
+    if 'animate' != plot_type:
+        print str(pdffilename)
+    else:
+        print str(plotfilename)
     exit(0)
-    

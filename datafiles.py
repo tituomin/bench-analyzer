@@ -35,6 +35,7 @@ def read_datafiles(files):
     keys_with_values = set()
     all_keys = set()
 
+    lineno = 1
     for i, f in enumerate(files):
         line = f.readline()
         labels = explode(line)
@@ -47,7 +48,6 @@ def read_datafiles(files):
         all_keys.update(labels)
 
         line = f.readline()
-        lineno = 1
         while line != '':
             exploded_line = explode(line)
             if len(labels) != len(exploded_line):
