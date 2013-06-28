@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 from collections import OrderedDict as odict
 from itertools import groupby
@@ -313,11 +314,19 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
             keyf=lambda x:x['lineno']
         else:
             keyf=lambda x:x[measure]
-        values = [b[measure] for b in sorted(group, key=keyf)]
+        values = [b[measure] for b in sorted(group, key=keyf)][0:50000]
+
+        from analysis import optimize_bins
+
+        #binwidth, valz = optimize_bins(values)
+        # todo: fix maybe?
+        # print binwidth
+        # exit(0)
+
         minimum = min(values)
         maximum = max(values)
         value_range = max(values) - minimum
-        binwidth = max((value_range / 1000000), 250)
+        binwidth = 10 # max((value_range / 1000000), 100)
         min_bin = (minimum / binwidth) * binwidth
         max_bin = (maximum / binwidth + 1) * binwidth
 #        resolution = 10000
@@ -401,28 +410,14 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
                     break
 
                 frame = frames[max_i - i]
-                # todo: move to gnuplot.py
-                gnuplotcommands.write('set bmargin 20\n')
-                gnuplotcommands.write('set tmargin 20\n')
-                gnuplotcommands.write('set rmargin 20\n')
-                gnuplotcommands.write('set lmargin 20\n')
                 gnuplotcommands.write(
                     gnuplot.templates['binned_frame'].format(
                         datapoints = frame['datapoints'],
                         values = frame['values'],
-                        color = gnuplot.hex_color_gradient((255,0,0), (255,255,0), float(i)/float(max_i))))
-                gnuplotcommands.write("unset xlabel\n")
-                gnuplotcommands.write("unset ylabel\n")
-                gnuplotcommands.write("unset label 1\n")
-                gnuplotcommands.write("unset title\n")
-                gnuplotcommands.write("unset xtics\n")
-                gnuplotcommands.write("unset ytics\n")
+                        color = gnuplot.hex_color_gradient((125,0,0), (255,255,0), float(i)/float(max_i))))
 
             gnuplotcommands.write("set xtics\n")
             gnuplotcommands.write("set ytics\n")
-
-
-#            gnuplotcommands.write('unset multiplot\n')
 
         if plot_type == None:
             gnuplotcommands.write(

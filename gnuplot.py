@@ -31,7 +31,17 @@ set yrange [0:{max_y}]
 
 templates['binned_frame'] = """
 #set label 2 "{datapoints}" at graph 0.8, graph 1.06
+set bmargin 20
+set tmargin 20
+set rmargin 20
+set lmargin 20
 plot '-' using 1:2 notitle with boxes lt rgb "{color}"\n{values}\ne\n
+unset xlabel
+unset ylabel
+unset label 1
+unset title
+unset xtics
+unset ytics
 """
 
 templates['simple_groups'] = """
