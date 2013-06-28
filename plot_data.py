@@ -317,11 +317,11 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
         minimum = min(values)
         maximum = max(values)
         value_range = max(values) - minimum
-        binwidth = max((value_range / 1000000), 1)
+        binwidth = max((value_range / 1000000), 250)
         min_bin = (minimum / binwidth) * binwidth
         max_bin = (maximum / binwidth + 1) * binwidth
 #        resolution = 10000
-        binwidth = max(1,binwidth)
+#        binwidth = max(1,binwidth)
 
         svals = sorted(values)
         percent_limit = svals[int(0.98 * (len(svals) - 1))]
@@ -393,8 +393,15 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
         elif plot_type == 'gradient':
             gnuplotcommands.write("set multiplot\n")
             max_i = len(frames) - 1
-            for i in range(0, len(frames)):
+            steps = 15
+            interval = len(frames) / steps
+            
+            for i in range(0, len(frames) + interval, interval):
+                if i >= len(frames):
+                    break
+
                 frame = frames[max_i - i]
+                # todo: move to gnuplot.py
                 gnuplotcommands.write('set bmargin 20\n')
                 gnuplotcommands.write('set tmargin 20\n')
                 gnuplotcommands.write('set rmargin 20\n')
@@ -403,11 +410,16 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
                     gnuplot.templates['binned_frame'].format(
                         datapoints = frame['datapoints'],
                         values = frame['values'],
-                        color = gnuplot.hex_color_gradient((255,0,0), (0,0,255), float(i)/float(max_i))))
+                        color = gnuplot.hex_color_gradient((255,0,0), (255,255,0), float(i)/float(max_i))))
                 gnuplotcommands.write("unset xlabel\n")
                 gnuplotcommands.write("unset ylabel\n")
                 gnuplotcommands.write("unset label 1\n")
                 gnuplotcommands.write("unset title\n")
+                gnuplotcommands.write("unset xtics\n")
+                gnuplotcommands.write("unset ytics\n")
+
+            gnuplotcommands.write("set xtics\n")
+            gnuplotcommands.write("set ytics\n")
 
 
 #            gnuplotcommands.write('unset multiplot\n')
@@ -683,6 +695,7 @@ if __name__ == '__main__':
             basename = "benchmarks-{n}.csv"
         filenames.append(
             basename.format(n=measurement['id']))
+        filenames.append(measurement['logfile'])
         ids.append(measurement['id'])
         multiplier += int(measurement['rounds'])
 

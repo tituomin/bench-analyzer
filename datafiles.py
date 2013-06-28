@@ -68,7 +68,6 @@ def read_datafiles(files):
             lineno += 1
 
     keys_without_values = all_keys - keys_with_values
-    print 'No values for', keys_without_values
 
     benchmark_keycount = None
     for benchmark in benchmarks:
