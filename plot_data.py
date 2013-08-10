@@ -326,14 +326,14 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
         minimum = min(values)
         maximum = max(values)
         value_range = max(values) - minimum
-        binwidth = 10 # max((value_range / 1000000), 100)
+        binwidth = max((value_range / 1000000), 1000)
         min_bin = (minimum / binwidth) * binwidth
         max_bin = (maximum / binwidth + 1) * binwidth
 #        resolution = 10000
 #        binwidth = max(1,binwidth)
 
         svals = sorted(values)
-        percent_limit = svals[int(0.98 * (len(svals) - 1))]
+        percent_limit = svals[int(0.60 * (len(svals) - 1))]
 
         value_count = len(values)
 
@@ -403,7 +403,7 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
             gnuplotcommands.write("set multiplot\n")
             max_i = len(frames) - 1
             steps = 15
-            interval = len(frames) / steps
+            interval = max(len(frames) / steps, 1)
             
             for i in range(0, len(frames) + interval, interval):
                 if i >= len(frames):
@@ -613,26 +613,30 @@ def sync_measurements(dev_path, host_path, filename, update=True):
 
 
 if __name__ == '__main__':
-    if len(argv) < 4 or len(argv) > 5:
+    if len(argv) < 4 or len(argv) > 6:
         print argv[0]
-        print "\n    Usage: %s input_path output_path limit [pdfviewer]\n".format(argv[0])
+        print "\n    Usage: %s input_path output_path limit [pdfviewer] [separate]\n".format(argv[0])
         exit(1)
 
     method = argv[0]
     measurement_path = argv[1]
     output_path = argv[2]
     limit = argv[3]
-    if len(argv) == 5:
+    if len(argv) > 4:
         pdfviewer = argv[4]
     else:
         pdfviewer = None
+    if len(argv) == 6:
+        group = (not argv[5] == "separate")
+    else:
+        group = True
 
     sync_measurements(DEVICE_PATH, measurement_path, MEASUREMENT_FILE)
 
     f = open(os.path.join(measurement_path, MEASUREMENT_FILE))
 
     try:
-        measurements = read_measurement_metadata(f)
+        measurements = read_measurement_metadata(f, group)
     finally:
         f.close()
 
@@ -744,6 +748,8 @@ if __name__ == '__main__':
     elif pdfviewer == 'gradient':
         plot_type = 'gradient'
         pdfviewer = None
+    else:
+        plot_type = None
     
     function(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id, metadata_f, plot_type=plot_type)
 

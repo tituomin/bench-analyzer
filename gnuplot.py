@@ -60,6 +60,7 @@ for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I
 """
 
 templates['named_columns'] = """
+set yrange [-500:*]
 set title '{title}'
 set label 2 "page {page}" at graph 0.01, graph 1.06
 set xlabel "{xlabel}"

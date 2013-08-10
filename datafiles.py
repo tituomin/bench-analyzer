@@ -83,17 +83,19 @@ def read_datafiles(files):
     print 'Read %d lines' % (lineno - 1)
     return benchmarks
 
-def read_measurement_metadata(mfile):
+def read_measurement_metadata(mfile, combine_compatibles):
     compatibles = odict()
     measurement = None
     line = None
 
+    i = 0
     while line != '':
         skipped = False
         while line == "\n":
             line = mfile.readline()
             skipped = True
 
+            
         if skipped:
             if measurement:
                 if 'tools' in measurement:
@@ -109,10 +111,14 @@ def read_measurement_metadata(mfile):
                     measurement['rounds'] = 1
                 
                 if revision and repetitions:
+                    if combine_compatibles:
                         key = (revision, checksum, repetitions, tool, cpufreq, benchmark_set, substring_filter)
-                        if key not in compatibles:
-                            compatibles[key] = []
-                        compatibles[key].append(measurement)
+                    else:
+                        key = i
+                        i += 1
+                    if key not in compatibles:
+                        compatibles[key] = []
+                    compatibles[key].append(measurement)
             measurement = {}
 
         if line != None:
