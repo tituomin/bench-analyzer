@@ -13,6 +13,7 @@ import shutil
 import uuid
 
 import numpy
+from numpy import array
 
 from jni_types import primitive_type_definitions, object_type_definitions, array_types
 from datafiles import read_datafiles, read_measurement_metadata
@@ -299,9 +300,11 @@ def binned_value(minimum, width, value):
     return width * (int(value - minimum) / int(width)) + minimum
     
 def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None):
+
     output_type='screen'
     if plot_type != 'animate':
         output_type='pdf'
+
     gnuplot.init(gnuplotcommands, output, bid, output=output_type)
     measure = 'response_time'
 
@@ -314,116 +317,86 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
             keyf=lambda x:x['lineno']
         else:
             keyf=lambda x:x[measure]
-        values = [b[measure] for b in sorted(group, key=keyf)][0:50000]
+        values = array([b[measure] for b in sorted(group, key=keyf)][0:50000])
 
-        from analysis import optimize_bins
+        bin_width = 500
+        min_x = numpy.amin(values)
+        max_x = numpy.amax(values)
 
-        #binwidth, valz = optimize_bins(values)
-        # todo: fix maybe?
-        # print binwidth
-        # exit(0)
+        bin_no = (max_x - min_x) / bin_width
 
-        minimum = min(values)
-        maximum = max(values)
-        value_range = max(values) - minimum
-        binwidth = max((value_range / 1000000), 1000)
-        min_bin = (minimum / binwidth) * binwidth
-        max_bin = (maximum / binwidth + 1) * binwidth
-#        resolution = 10000
-#        binwidth = max(1,binwidth)
+        hgram, bin_edges = numpy.histogram(values, bins=bin_no)
 
-        svals = sorted(values)
-        percent_limit = svals[int(0.60 * (len(svals) - 1))]
-
-        value_count = len(values)
-
-        counts = odict()
-        max_count = 0
-        i = 0
-        for left in [x for x in range(min_bin, max_bin, binwidth)]:
-            count = 0
-            while i < len(svals) and svals[i] < left + binwidth:
-                count += 1
-                i += 1
-
-            max_count = max(count, max_count)
-            counts[left] = {
-                'limit': left,
-                'count': count,
-                'percent': float(count) / value_count }
-
-        metadata_file.write('Direction {0}\n'.format(group[0]['direction']))
-        for val in sorted(counts.itervalues(), key=lambda x:-x['count'])[0:20]:
-            metadata_file.write("{:>12} {:>12} {:>12}\n".format(
-                    val['limit'], val['percent'], val['count']))
-        metadata_file.write("---\n")
-        for val in sorted(counts.itervalues(), key=lambda x:x['limit']):
-            metadata_file.write("{:>12} {:>12} {:>12}\n".format(
-                    val['limit'], val['percent'], val['count']))
+        # metadata_file.write('Direction {0}\n'.format(group[0]['direction']))
+        # for val in sorted(counts.itervalues(), key=lambda x:-x['count'])[0:20]:
+        #     metadata_file.write("{:>12} {:>12} {:>12}\n".format(
+        #             val['limit'], val['percent'], val['count']))
+        # metadata_file.write("---\n")
+        # for val in sorted(counts.itervalues(), key=lambda x:x['limit']):
+        #     metadata_file.write("{:>12} {:>12} {:>12}\n".format(
+        #             val['limit'], val['percent'], val['count']))
 
         gnuplotcommands.write(
             gnuplot.templates['binned_init'].format(
                 title='%s %s' % (group[0]['id'], group[0]['direction']),
-                binwidth=binwidth, min_x=minimum - binwidth, max_x=percent_limit,
-                max_y=max_count))
+                binwidth=bin_edges[1]-bin_edges[0], min_x=0, max_x=bin_edges[-1],
+                max_y=numpy.max(hgram)))
             
-        counts = odict()
-
         initial_animstep = 1000
         animstep = initial_animstep
         if plot_type == 'animate':
             gnuplotcommands.write('pause -1\n')
 
-        frames = []
+#         frames = []
 
-        for i, val in enumerate(values):
-            key = binned_value(min_bin, binwidth, val)
-            count = counts.get(key, 0) + 1
-            counts[key] = count
-            if plot_type != None:
-                animstep -= 1
-                if animstep == 0:
-#                    initial_animstep += 10
-                    animstep = initial_animstep
-                    frames.append({
-                            'datapoints' : i+1,
-                            'values' : '\n'.join(
-                                ['{} {} {}'.format(val + binwidth/2.0, count, val)
-                                 for val, count in counts.iteritems()])})
+#         for i, val in enumerate(values):
+#             key = binned_value(min_bin, binwidth, val)
+#             count = counts.get(key, 0) + 1
+#             counts[key] = count
+#             if plot_type != None:
+#                 animstep -= 1
+#                 if animstep == 0:
+# #                    initial_animstep += 10
+#                     animstep = initial_animstep
+#                     frames.append({
+#                             'datapoints' : i+1,
+#                             'values' : '\n'.join(
+#                                 ['{} {} {}'.format(val + binwidth/2.0, count, val)
+#                                  for val, count in counts.iteritems()])})
 
-        if plot_type == 'animate':
-            for frame in frames:
-                gnuplotcommands.write(
-                    gnuplot.templates['binned_frame'].format(
-                        datapoints = frame['datapoints'],
-                        values = frame['values'],
-                        color = "#33FF33"))
+#         if plot_type == 'animate':
+#             for frame in frames:
+#                 gnuplotcommands.write(
+#                     gnuplot.templates['binned_frame'].format(
+#                         datapoints = frame['datapoints'],
+#                         values = frame['values'],
+#                         color = "#33FF33"))
 
-        elif plot_type == 'gradient':
-            gnuplotcommands.write("set multiplot\n")
-            max_i = len(frames) - 1
-            steps = 15
-            interval = max(len(frames) / steps, 1)
+#         elif plot_type == 'gradient':
+#             gnuplotcommands.write("set multiplot\n")
+#             max_i = len(frames) - 1
+#             steps = 15
+#             interval = max(len(frames) / steps, 1)
             
-            for i in range(0, len(frames) + interval, interval):
-                if i >= len(frames):
-                    break
+#             for i in range(0, len(frames) + interval, interval):
+#                 if i >= len(frames):
+#                     break
 
-                frame = frames[max_i - i]
-                gnuplotcommands.write(
-                    gnuplot.templates['binned_frame'].format(
-                        datapoints = frame['datapoints'],
-                        values = frame['values'],
-                        color = gnuplot.hex_color_gradient((125,0,0), (255,255,0), float(i)/float(max_i))))
+#                 frame = frames[max_i - i]
+#                 gnuplotcommands.write(
+#                     gnuplot.templates['binned_frame'].format(
+#                         datapoints = frame['datapoints'],
+#                         values = frame['values'],
+#                         color = gnuplot.hex_color_gradient((125,0,0), (255,255,0), float(i)/float(max_i))))
 
-            gnuplotcommands.write("set xtics\n")
-            gnuplotcommands.write("set ytics\n")
+#             gnuplotcommands.write("set xtics\n")
+#             gnuplotcommands.write("set ytics\n")
 
         if plot_type == None:
             gnuplotcommands.write(
                 gnuplot.templates['binned_frame'].format(
-                    values = '\n'.join(['{} {} {}'.format(val + binwidth/2.0, count, val) for val, count in counts.iteritems()])))
-
+                    datapoints = '', color='#000000',
+                    values = '\n'.join(['{} {} {}'.format(val, count, val) for val, count in zip(bin_edges, hgram)])))
 
 
 def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None):
@@ -650,6 +623,7 @@ if __name__ == '__main__':
         print """
     [{idx}]:     total measurements: {num}
                      repetitions: {reps}
+                     description: {desc}
                           rounds: {rounds}
                         checksum: {ck}
                         revision: {rev}
@@ -670,6 +644,7 @@ if __name__ == '__main__':
         tool    = b.get('tool'),
         freq    = b.get('cpu-freq'),
         bset    = b.get('benchmark-set'),
+        desc    = b.get('description'),
         sfilter = b.get('substring-filter'),
         first   = b.get('start')
         )
