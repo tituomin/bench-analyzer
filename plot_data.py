@@ -317,15 +317,16 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
             keyf=lambda x:x['lineno']
         else:
             keyf=lambda x:x[measure]
-        values = array([b[measure] for b in sorted(group, key=keyf)][0:50000])
+        values = array([b[measure] for b in sorted(group, key=keyf)])
 
-        bin_width = 500
+        bin_width = 100
         min_x = numpy.amin(values)
         max_x = numpy.amax(values)
 
         bin_no = (max_x - min_x) / bin_width
 
-        hgram, bin_edges = numpy.histogram(values, bins=bin_no)
+        raw_hgram, bin_edges = numpy.histogram(values, bins=100)
+        hgram = raw_hgram[raw_hgram>1]
 
         # metadata_file.write('Direction {0}\n'.format(group[0]['direction']))
         # for val in sorted(counts.itervalues(), key=lambda x:-x['count'])[0:20]:
@@ -395,7 +396,7 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
         if plot_type == None:
             gnuplotcommands.write(
                 gnuplot.templates['binned_frame'].format(
-                    datapoints = '', color='#000000',
+                    datapoints = '', color='#000033',
                     values = '\n'.join(['{} {} {}'.format(val, count, val) for val, count in zip(bin_edges, hgram)])))
 
 
