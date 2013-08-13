@@ -322,36 +322,39 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
         if plot_type != None:
             frame_count = 256
 
-        current_frame = 1
+        current_frame = frame_count
         all_values = [b[measure] for b in sorted(group, key=keyf)]
-        while current_frame <= frame_count:
+        while current_frame > 0:
 
-            frame_ratio = float(current_frame)/frame_count
+            if current_frame == frame_count:
+                frame_ratio = 1
+            else:
+                frame_ratio = float(current_frame)/frame_count
             values = array(all_values[0:int(frame_ratio*len(all_values))])
 
             bin_width = 500
-            min_x = numpy.amin(values)
-            max_x = numpy.amax(values)
+            min_x = numpy.amin(all_values)
+            max_x = numpy.amax(all_values)
 
             bin_no = (max_x - min_x) / bin_width
 
             hgram, bin_edges = numpy.histogram(values, bins=max(bin_no, 10))
-            #hgram = raw_hgram[raw_hgram>1]
 
             mode = bin_edges[numpy.argmax(hgram)]
             min_x = mode - 100000
             max_x = mode + 100000
 
-            # metadata_file.write('Direction {0}\n'.format(group[0]['direction']))
-            # for val in sorted(counts.itervalues(), key=lambda x:-x['count'])[0:20]:
-            #     metadata_file.write("{:>12} {:>12} {:>12}\n".format(
-            #             val['limit'], val['percent'], val['count']))
-            # metadata_file.write("---\n")
-            # for val in sorted(counts.itervalues(), key=lambda x:x['limit']):
-            #     metadata_file.write("{:>12} {:>12} {:>12}\n".format(
-            #             val['limit'], val['percent'], val['count']))
 
-            if current_frame == 1:
+            if current_frame == frame_count:
+                metadata_file.write('Direction {0}\n'.format(group[0]['direction']))
+                # for val in sorted(counts.itervalues(), key=lambda x:-x['count'])[0:20]:
+                #     metadata_file.write("{:>12} {:>12} {:>12}\n".format(
+                #             val['limit'], val['percent'], val['count']))
+                # metadata_file.write("---\n")
+                # for val in sorted(counts.itervalues(), key=lambda x:x['limit']):
+                #     metadata_file.write("{:>12} {:>12} {:>12}\n".format(
+                #             val['limit'], val['percent'], val['count']))
+
                 gnuplotcommands.write(
                     gnuplot.templates['binned_init'].format(
                         title='%s %s' % (group[0]['id'], group[0]['direction']),
@@ -364,61 +367,23 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
                 elif plot_type == 'gradient':
                     gnuplotcommands.write("set multiplot\n")
 
-            current_frame += 1
-            # initial_animstep = 1000
-            # animstep = initial_animstep
-
-    #         frames = []
-
-    #         for i, val in enumerate(values):
-    #             key = binned_value(min_bin, binwidth, val)
-    #             count = counts.get(key, 0) + 1
-    #             counts[key] = count
-    #             if plot_type != None:
-    #                 animstep -= 1
-    #                 if animstep == 0:
-    # #                    initial_animstep += 10
-    #                     animstep = initial_animstep
-    #                     frames.append({
-    #                             'datapoints' : i+1,
-    #                             'values' : '\n'.join(
-    #                                 ['{} {} {}'.format(val + binwidth/2.0, count, val)
-    #                                  for val, count in counts.iteritems()])})
-
-    #         if plot_type == 'animate':
-    #             for frame in frames:
-    #                 gnuplotcommands.write(
-    #                     gnuplot.templates['binned_frame'].format(
-    #                         datapoints = frame['datapoints'],
-    #                         values = frame['values'],
-    #                         color = "#33FF33"))
-
-    #         elif plot_type == 'gradient':
-    #             gnuplotcommands.write("set multiplot\n")
-    #             max_i = len(frames) - 1
-    #             steps = 15
-    #             interval = max(len(frames) / steps, 1)
-
-    #             for i in range(0, len(frames) + interval, interval):
-    #                 if i >= len(frames):
-    #                     break
-
-    #                 frame = frames[max_i - i]
-    #                 gnuplotcommands.write(
-    #                     gnuplot.templates['binned_frame'].format(
-    #                         datapoints = frame['datapoints'],
-    #                         values = frame['values'],
-    #                         color = gnuplot.hex_color_gradient((125,0,0), (255,255,0), float(i)/float(max_i))))
-
-    #             gnuplotcommands.write("set xtics\n")
-    #             gnuplotcommands.write("set ytics\n")
+            current_frame -= 1
 
             if plot_type == None:
                 gnuplotcommands.write(
                     gnuplot.templates['binned_frame'].format(
                         datapoints = '', color='#000033',
                         values = '\n'.join(['{} {} {}'.format(val, count, val) for val, count in zip(bin_edges, hgram)])))
-            #elif plot_type == 'gradient':
+
+            elif plot_type == 'gradient':
+                gnuplotcommands.write(
+                    gnuplot.templates['binned_frame'].format(
+                        datapoints = '',
+                        color = gnuplot.hex_color_gradient((125,0,0), (255,255,0), 1-frame_ratio),
+                        values = '\n'.join(['{} {} {}'.format(val, count, val) for val, count in zip(bin_edges, hgram)])))
+
+        gnuplotcommands.write("set xtics\n")
+        gnuplotcommands.write("set ytics\n")
                 
 
 

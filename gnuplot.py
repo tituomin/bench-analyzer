@@ -40,8 +40,8 @@ plot '-' using 1:2 notitle with boxes lt rgb "{color}"\n{values}\ne\n
 #unset ylabel
 #unset label 1
 #unset title
-#unset xtics
-#unset ytics
+unset xtics
+unset ytics
 """
 
 templates['simple_groups'] = """
