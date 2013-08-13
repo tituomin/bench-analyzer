@@ -351,7 +351,7 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
             #     metadata_file.write("{:>12} {:>12} {:>12}\n".format(
             #             val['limit'], val['percent'], val['count']))
 
-            if current_frame = 1:
+            if current_frame == 1:
                 gnuplotcommands.write(
                     gnuplot.templates['binned_init'].format(
                         title='%s %s' % (group[0]['id'], group[0]['direction']),
@@ -364,6 +364,7 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
                 elif plot_type == 'gradient':
                     gnuplotcommands.write("set multiplot\n")
 
+            current_frame += 1
             # initial_animstep = 1000
             # animstep = initial_animstep
 
@@ -417,7 +418,7 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
                     gnuplot.templates['binned_frame'].format(
                         datapoints = '', color='#000033',
                         values = '\n'.join(['{} {} {}'.format(val, count, val) for val, count in zip(bin_edges, hgram)])))
-            elif plot_type == 'gradient':
+            #elif plot_type == 'gradient':
                 
 
 
@@ -698,7 +699,7 @@ if __name__ == '__main__':
     files = []
     for filename in filenames:
         sync_measurements(DEVICE_PATH, measurement_path, filename, update=False)
-        if filename != measurement['logfile']:
+        if filename not in [m['logfile'] for m in benchmark_group]:
             files.append(open(os.path.join(measurement_path, filename)))
 
     first_measurement = benchmark_group[0]
