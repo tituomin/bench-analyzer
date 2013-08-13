@@ -12,6 +12,8 @@ def explode(line):
     return line.split(SEPARATOR)
 
 def value(string, key=None):
+    if key in ['start', 'end']:
+        return string
     if key == 'class':
         return string.split('.')[-1]
     if string == '-' or RE_EMPTY.match(string):
