@@ -606,7 +606,7 @@ if __name__ == '__main__':
     limited_measurements = filter(lambda x: int(x[0].get('repetitions', 0)) >= int(limit),
                                   measurements.values())
 
-    for m in limited_measurements:
+    for m in limited_measurements[-20:-1]:
         b = m[0]
         print """
     [{idx}]:     total measurements: {num}
@@ -657,14 +657,14 @@ if __name__ == '__main__':
             basename = "benchmarks-{n}.csv"
         filenames.append(
             basename.format(n=measurement['id']))
-        filenames.append(measurement['logfile'])
+        if 'logfile' in measurement: filenames.append(measurement['logfile'])
         ids.append(measurement['id'])
         multiplier += int(measurement['rounds'])
 
     files = []
     for filename in filenames:
         sync_measurements(DEVICE_PATH, measurement_path, filename, update=False)
-        if filename not in [m['logfile'] for m in benchmark_group]:
+        if filename not in [m.get('logfile') for m in benchmark_group]:
             files.append(open(os.path.join(measurement_path, filename)))
 
     first_measurement = benchmark_group[0]
