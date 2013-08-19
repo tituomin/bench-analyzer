@@ -607,7 +607,12 @@ if __name__ == '__main__':
     limited_measurements = filter(lambda x: int(x[0].get('repetitions', 0)) >= int(limit),
                                   measurements.values())
 
-    csv_files = set([f.split('.csv')[0].split('benchmarks-')[1] for f in glob.iglob(measurement_path + '/*.csv')])
+    csv_files = set()
+    for f in glob.iglob(measurement_path + '/benchmarks-*.csv'):
+        try:
+            csv_files.add(f.split('.csv')[0].split('benchmarks-')[1])
+        except IndexError:
+            pass
 
     print len(limited_measurements)
     i = len(limited_measurements) - 20 + 1
