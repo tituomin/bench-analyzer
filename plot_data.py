@@ -12,6 +12,8 @@ import os
 import shutil
 import uuid
 
+import glob
+
 import numpy
 from numpy import array
 
@@ -580,7 +582,7 @@ if __name__ == '__main__':
         exit(1)
 
     method = argv[0]
-    measurement_path = argv[1]
+    measurement_path = os.path.normpath(argv[1])
     output_path = argv[2]
     limit = argv[3]
     if len(argv) > 4:
@@ -602,17 +604,22 @@ if __name__ == '__main__':
         f.close()
 
     print "\nAvailable compatible measurements. Choose one"
-    i = 1
     limited_measurements = filter(lambda x: int(x[0].get('repetitions', 0)) >= int(limit),
                                   measurements.values())
 
-    for m in limited_measurements[-20:-1]:
+    csv_files = set([f.split('.csv')[0].split('benchmarks-')[1] for f in glob.iglob(measurement_path + '/*.csv')])
+
+    print len(limited_measurements)
+    i = len(limited_measurements) - 20 + 1
+    for m in limited_measurements[-20:]:
         b = m[0]
         print """
     [{idx}]:     total measurements: {num}
+                           local: {local}
                      repetitions: {reps}
                      description: {desc}
                           rounds: {rounds}
+                              id: {mid}
                         checksum: {ck}
                         revision: {rev}
                             tool: {tool}
@@ -622,7 +629,9 @@ if __name__ == '__main__':
                            dates: {first} -
                                   {last}
     """.format(
+        local   = b.get('id') in csv_files,
         num     = len(m),
+        mid     = b.get('id'),
         idx     = i,
         last    = m[-1]['end'],
         rounds  = reduce(lambda x,y: y+x, [int(b['rounds']) for b in m]),
