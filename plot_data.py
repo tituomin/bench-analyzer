@@ -92,7 +92,7 @@ def extract_data(benchmarks,
                  min_series_length=2, sort=None, min_series_width=None):
 
     # info == extra metadata not to be analyzed
-    info = ['no', 'from', 'to', 'lineno']
+    info = ['no', 'from', 'to', 'lineno', 'start', 'end']
 
     if 'class' in benchmarks[0]:
         info.append('class')
