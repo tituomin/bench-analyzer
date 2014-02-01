@@ -52,9 +52,11 @@ def read_datafiles(files):
         line = f.readline()
         while line != '':
             exploded_line = explode(line)
+            pad_amount = len(labels) - len(exploded_line)
+            exploded_line.extend(['-'] * pad_amount)
             if len(labels) != len(exploded_line):
-                print 'missing values', f.name, 'line', lineno, 'labels', len(labels), 'values', len(exploded_line)
-                exit(1)
+                 print 'missing values', f.name, 'line', lineno, 'labels', len(labels), 'values', len(exploded_line)
+                 exit(1)
 
             benchmark = dict()
             benchmark['lineno'] = lineno
@@ -79,7 +81,7 @@ def read_datafiles(files):
         current_keycount = len(benchmark.keys())
         benchmark_keycount = benchmark_keycount or current_keycount
         if benchmark_keycount != current_keycount:
-            print "Benchmarks have different amount of data", benchmark_keycount, current_keycount
+            print "Benchmarks have different amount of data", benchmark_keycount, current_keycount, "at line", benchmark['lineno']
             exit(1)
 
     print 'Read %d lines' % (lineno - 1)

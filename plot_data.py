@@ -419,17 +419,17 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 measure = 'response_time',
                 variable = 'description')
 
-            if overhead_data != None:
-                if len(overhead_data) > 1:
-                    print 'Error, more loop types than expected.', len(overhead_data)
-                    exit(1)
+            if overhead_data == None: pass
+            if len(overhead_data) > 1:
+                print 'Error, more loop types than expected.', len(overhead_data)
+                exit(1)
 
-                series = overhead_data[0]
-                headers, rows = make_table(
-                    series, 'from', 'description', 'response_time', 'workload')
-                est = estimate_measuring_overhead(rows[1:])
-                overhead_estimates[from_lang][loop_type] = est[0]
-                metadata_file.write('Overhead ' + from_lang + ' ' + str(est[0]))
+            series = overhead_data[0]
+            headers, rows = make_table(
+                series, 'from', 'description', 'response_time', 'workload')
+            est = estimate_measuring_overhead(rows[1:])
+            overhead_estimates[from_lang][loop_type] = est[0]
+            metadata_file.write('Overhead ' + from_lang + ' ' + str(est[0]))
 
     for i, ptype in enumerate(types):
         plot(
