@@ -419,7 +419,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 measure = 'response_time',
                 variable = 'description')
 
-            if overhead_data == None: pass
+            if overhead_data == None:
+                continue
             if len(overhead_data) > 1:
                 print 'Error, more loop types than expected.', len(overhead_data)
                 exit(1)
