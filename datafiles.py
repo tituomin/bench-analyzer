@@ -67,7 +67,9 @@ def read_datafiles(files):
                 if value(string, key=key) != None:
                     keys_with_values.add(key)
 
-            benchmarks.append(benchmark)
+            if benchmark['response_time'] != None:
+                benchmarks.append(benchmark)
+
             line = f.readline()
             lineno += 1
 
