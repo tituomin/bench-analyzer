@@ -619,12 +619,15 @@ if __name__ == '__main__':
     i = len(limited_measurements) - 20 + 1
     for m in limited_measurements[-20:]:
         b = m[0]
+        warning = ""
+        if int(b.get('rounds')) == 0:
+            warning = " <---- WARNING INCOMPLETE MEASUREMENT"
         print """
     [{idx}]:     total measurements: {num}
                            local: {local}
                      repetitions: {reps}
                      description: {desc}
-                          rounds: {rounds}
+                          rounds: {rounds}{warning}
                               id: {mid}
                         checksum: {ck}
                         revision: {rev}
@@ -639,6 +642,7 @@ if __name__ == '__main__':
         num     = len(m),
         mid     = b.get('id'),
         idx     = i,
+        warning = warning,
         last    = m[-1]['end'],
         rounds  = reduce(lambda x,y: y+x, [int(b['rounds']) for b in m]),
         reps    = b.get('repetitions'),
