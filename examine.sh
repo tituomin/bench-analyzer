@@ -1,8 +1,16 @@
 #!/bin/bash
 
-if [ $# -ne 2 ]
-then
-  head -n 1 $1 | tr ',' "\n" | column
+DIR="$( cd "$( dirname "${BASH_SOURCE[@]}" )" && pwd )"
+echo $DIR
+
+FILENAME=$1
+
+if [ $# -lt 2 ]; then
+  echo -e "Available fields to use as second parameter\n(separate several fields with commas)\n"
+  head -n 1 $FILENAME | tr ',' "\n" | column
 else
-    awk -F, -v fields="$2" -f ~/gradu/code/analyzer/examine.awk $1 | column -t -s, | less
+    shift
+    FIELDNAMES="$@"
+    echo $FIELDNAMES
+    awk -F, -v fieldnames="$FIELDNAMES" -f "$DIR/examine.awk" $FILENAME  | column -t -s, | less
 fi
