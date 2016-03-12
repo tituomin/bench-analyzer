@@ -32,7 +32,7 @@ def optimize_bins(x):
 
     Histogram Binwidth Optimization Method
 
-    Shimazaki and Shinomoto, Neural Comput 19 1503-1527, 2007 
+    Shimazaki and Shinomoto, Neural Comput 19 1503-1527, 2007
     2006 Author Hideaki Shimazaki, Matlab
     Department of Physics, Kyoto University
     shimazaki at ton.scphys.kyoto-u.ac.jp
@@ -83,7 +83,7 @@ def optimize_bins(x):
     for i in xrange(size(N)):
         edges = linspace(x_min,x_max,N[i]+1) # Bin edges
         ki = hist(x,edges) # Count # of events in bins
-        ki = ki[0]    
+        ki = ki[0]
         k = mean(ki) #Mean of event count
         v = sum((ki-k)**2)/N[i] #Variance of event count
         C[i] = (2*k-v)/((D[i])**2) #The cost Function
@@ -104,7 +104,7 @@ def optimize_bins(x):
     # title(u"Histogram")
     # ylabel(u"Frequency")
     # xlabel(u"Value")
-    # savefig('Hist.png')         
+    # savefig('Hist.png')
     # fig = figure()
     # plot(D,C,'.b',optD,cmin,'*r')
     # savefig('Fobj.png')
