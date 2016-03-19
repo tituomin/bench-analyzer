@@ -46,14 +46,14 @@ unset ytics
 
 templates['simple_groups'] = """
 set title '{title}'
-set label 2 "page {page}" at graph 0.01, graph 1.06
+set label 2 "page {page}" at screen 0.9, screen 0.95
 set xlabel "{xlabel}"
 plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with linespoints
 """
 
 templates['fitted_lines'] = """
 set title '{title}'
-set label 2 "page {page}" at graph 0.01, graph 1.06
+set label 2 "page {page}" at screen 0.9, screen 0.95
 set xlabel "{xlabel}"
 plot for [I=2:{last_real_column}] '{filename}' index {index} using 1:I title columnhead with points, \
 for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I title columnhead with lines
@@ -62,14 +62,14 @@ for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I
 templates['named_columns'] = """
 set yrange [-500:*]
 set title '{title}'
-set label 2 "page {page}" at graph 0.01, graph 1.06
+set label 2 "page {page}" at screen 0.9, screen 0.95
 set xlabel "{xlabel}"
 plot for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title columnhead with linespoints
 """
 
 templates['histogram'] = """
 set title '{title}'
-set label 2 "page {page}" at graph 0.01, graph 1.06
+set label 2 "page {page}" at screen 0.9, screen 0.95
 set xlabel "{xlabel}"
 set xtics rotate
 #set boxwidth 20
