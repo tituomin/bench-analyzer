@@ -208,13 +208,16 @@ def plot(
         if select_predicate(x)]
 
     variables = set([benchmark[variable] for benchmark in filtered_benchmarks])
+
     if len(variables) < 2:
-        print 'Skipping plot without enough data variables\n'
+        print 'Skipping plot without enough data variables', title, '\n'
         return
 
     if len(filtered_benchmarks) == 0:
         print 'Error, no benchmarks for', title
         exit(1)
+
+    print 'Plotting', title
 
     specs = {
         'group'            : group,
