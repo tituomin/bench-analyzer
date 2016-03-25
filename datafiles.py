@@ -5,7 +5,7 @@ from collections import OrderedDict as odict
 
 SEPARATOR = ','
 RE_EMPTY = re.compile('^\s*$')
-RE_NUMERICAL = re.compile('-?[0-9]+')
+RE_NUMERICAL = re.compile('^-?[0-9]+$')
 
 
 def explode(line):
@@ -67,8 +67,8 @@ def read_datafiles(files):
                 if value(string, key=key) != None:
                     keys_with_values.add(key)
 
-            if benchmark['response_time'] != None:
-                benchmarks.append(benchmark)
+            #if benchmark['response_time'] != None:
+            benchmarks.append(benchmark)
 
             line = f.readline()
             lineno += 1

@@ -13,6 +13,7 @@ import shutil
 import uuid
 
 import glob
+import zipfile
 
 import numpy
 from numpy import array
@@ -592,6 +593,69 @@ def sync_measurements(dev_path, host_path, filename, update=True):
     else:
         print "Could not get new measurements, continuing with old."
 
+def render_perf_reports_for_measurement(identifier, measurements, measurement_path, output_path):
+    path = identifier.split("/")
+    if len(path) < 3:
+        print 'Invalid identifier {}'.format(identifier)
+        exit(1)
+    if len(path) == 4:
+        revision, checksum, class_, dynamic_size = path
+    elif len(path) == 3:
+        revision, checksum, class_ = path
+        dynamic_size = None
+
+    def match_measurement(measurement):
+        m = measurement[0]
+        return (m.get('code-checksum') == checksum and
+         m.get('code-revision') == revision and
+         m.get('tool') == 'LinuxPerfRecordTool')
+
+    def match_measurement_run(m):
+        if m.get('class') != class_:
+            return False
+        if dynamic_size and m.get('dynamic_size') != int(dynamic_size):
+            return False
+        return True
+
+    datafiles = []
+    for measurement in filter(match_measurement, measurements)[0:1]: #TODO: multiple?
+        mid = measurement[0].get('id')
+        zpath = os.path.join(measurement_path, 'perfdata-{}.zip'.format(mid))
+        measurement_zipfile = zipfile.ZipFile(zpath, 'r')
+        datafiles.append({
+            'zip': measurement_zipfile,
+            'mid': mid,
+            'csv': measurement_zipfile.open('{0}/benchmarks-{0}.csv'.format(mid))
+        })
+
+    benchmarks = []
+    for df in datafiles:
+        benchmarks.append({
+            'zip': df['zip'],
+            'mid': df['mid'],
+            'metadata': read_datafiles([df['csv']])
+        })
+
+    matching_benchmarks = []
+    for bm in benchmarks:
+        for row in bm['metadata']:
+            if match_measurement_run(row):
+                matching_benchmarks.append({
+                    'zip': bm['zip'],
+                    'mid': bm['mid'],
+                    'filename': row['Filename']
+                })
+
+    for record in matching_benchmarks:
+        perf_file = record['zip'].extract('{}/{}'.format(record['mid'], record['filename']), '/tmp')
+        try:
+            call(["perf report -i {} --symfs=/home/tituomin/droid-symbols --kallsyms=/home/tituomin/droid/linux-kernel/kallsyms".format(perf_file)], shell=True)
+        except OSError as e:
+            print e.filename, e.message, e.args
+
+    for f in datafiles:
+        f['zip'].close()
+    exit(0)
 
 if __name__ == '__main__':
     if len(argv) < 4 or len(argv) > 6:
@@ -626,6 +690,12 @@ if __name__ == '__main__':
     print "\nAvailable compatible measurements. Choose one"
     limited_measurements = filter(lambda x: int(x[0].get('repetitions', 0)) >= int(limit),
                                   measurements.values())
+
+    # ID = revision/checksum/class[/dynamic_size]
+    if 'perf_select' in method:
+        identifier = argv[4]
+        render_perf_reports_for_measurement(identifier, limited_measurements, measurement_path, output_path)
+        exit(0)
 
     csv_files = set()
     for f in glob.iglob(measurement_path + '/benchmarks-*.csv'):
@@ -719,46 +789,51 @@ if __name__ == '__main__':
         'multiplier': multiplier
     }
 
-    try:
-        if 'LinuxPerfRecordTool' in first_measurement['tool']:
-            print 'Nothing to be done for perf data. Exiting.'
-            exit(0)
-        benchmarks = read_datafiles(files)
+    perf = False
+    if 'LinuxPerfRecordTool' in first_measurement['tool']:
+        print 'Perf data downloaded.'
+        perf = True
+    if not perf:
+        try:
+            benchmarks = read_datafiles(files)
 
-    finally:
-        for f in files:
-            f.close()
+        finally:
+            for f in files:
+                f.close()
 
-    benchmark_group_id = str(uuid.uuid4())
-    plot_prefix = 'plot-{0}'.format(benchmark_group_id)
+        benchmark_group_id = str(uuid.uuid4())
+        plot_prefix = 'plot-{0}'.format(benchmark_group_id)
 
-    pdf_filename = os.path.join(output_path, plot_prefix + '.pdf')
-    plot_filename = plot_prefix + '.gp'
+        pdf_filename = os.path.join(output_path, plot_prefix + '.pdf')
+        plot_filename = plot_prefix + '.gp'
 
-    plotfile = open(os.path.join(output_path, plot_filename), 'w')
-    metadata_file = open(os.path.join(
-        output_path, plot_prefix + '-metadata.txt'), 'w')
+        plotfile = open(os.path.join(output_path, plot_filename), 'w')
+        metadata_file = open(os.path.join(
+            output_path, plot_prefix + '-metadata.txt'), 'w')
 
-    measurement_ids = " ".join(ids)
-    metadata_file.write("id: {0}\n".format(benchmark_group_id))
-    metadata_file.write("measurements: {0}\n".format(measurement_ids))
+        measurement_ids = " ".join(ids)
+        metadata_file.write("id: {0}\n".format(benchmark_group_id))
+        metadata_file.write("measurements: {0}\n".format(measurement_ids))
 
-    preprocess_benchmarks(benchmarks, global_values)
+        preprocess_benchmarks(benchmarks, global_values)
 
-    animate = False
-    if pdfviewer == 'anim':
-        plot_type = 'animate'
-        pdfviewer = None
-    elif pdfviewer == 'gradient':
-        plot_type = 'gradient'
-        pdfviewer = None
-    else:
-        plot_type = None
+        animate = False
+        if pdfviewer == 'anim':
+            plot_type = 'animate'
+            pdfviewer = None
+        elif pdfviewer == 'gradient':
+            plot_type = 'gradient'
+            pdfviewer = None
+        else:
+            plot_type = None
 
     if 'curves' in method:
         function = plot_benchmarks
     elif 'distributions' in method:
         function = plot_distributions
+    if not function:
+        exit(0)
+
     function(
         benchmarks,
         pdf_filename,
