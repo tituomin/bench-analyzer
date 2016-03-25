@@ -115,10 +115,11 @@ def extract_data(benchmarks,
         benchmarks,
         cmp=functools.partial(comp_function, sorted_keys))
 
-    # 1. group benchmarks into a multi-dimensional list of the structure
-    # compatible-measurements (controlled variables are equal)
-    #     plots (list of individual data series ie. plots)
-    #         multiple measurements ()
+    # 1. group benchmarks into a multi-dimensional list
+    #    with the following structure:
+    #    - compatible-measurements (controlled variables are equal)
+    #      - plots (list of individual data series ie. plots)
+    #        - multiple measurements ()
     benchmarks = group_by_keys(sorted_benchmarks, controlled_variables)
     for i, x  in enumerate(benchmarks):
         benchmarks[i] = group_by_keys(x, [group])
@@ -196,11 +197,10 @@ def without(keys, d):
     return dict(((key, val) for key, val in d.iteritems() if key not in keys))
 
 def plot(
-    benchmarks, gnuplot_script, plotpath, metadata_file, keys_to_remove=None, select_predicate=None,
-    group=None, variable=None, measure=None, title=None,
-    style=None, min_series_width=1):
-
-    print 'Plotting', title
+    benchmarks, gnuplot_script, plotpath, metadata_file,
+    keys_to_remove=None, select_predicate=None,
+    group=None, variable=None, measure=None,
+    title=None, style=None, min_series_width=1):
 
     filtered_benchmarks = [
         without(keys_to_remove, x)
@@ -696,7 +696,7 @@ if __name__ == '__main__':
     global_values = {
         'repetitions': first_measurement['repetitions'],
         'multiplier' : multiplier
-        }
+    }
 
     try:
         if 'LinuxPerfRecordTool' in first_measurement['tool']:
@@ -708,8 +708,6 @@ if __name__ == '__main__':
         for f in files:
             f.close()
 
-#    pp.pprint(benchmarks)
-
     benchmark_group_id = str(uuid.uuid4())
     plot_prefix = 'plot-{0}'.format(benchmark_group_id)
 
@@ -717,11 +715,11 @@ if __name__ == '__main__':
     plot_filename = plot_prefix + '.gp'
 
     plotfile = open(os.path.join(output_path, plot_filename), 'w')
-    metadata_f = open(os.path.join(output_path, plot_prefix + '-metadata.txt'), 'w')
+    metadata_file = open(os.path.join(output_path, plot_prefix + '-metadata.txt'), 'w')
 
     measurement_ids = " ".join(ids)
-    metadata_f.write("id: {0}\n".format(benchmark_group_id))
-    metadata_f.write("measurements: {0}\n".format(measurement_ids))
+    metadata_file.write("id: {0}\n".format(benchmark_group_id))
+    metadata_file.write("measurements: {0}\n".format(measurement_ids))
 
     preprocess_benchmarks(benchmarks, global_values)
 
@@ -739,7 +737,14 @@ if __name__ == '__main__':
         function = plot_benchmarks
     elif 'distributions' in method:
         function = plot_distributions
-    function(benchmarks, pdf_filename, PLOTPATH, plotfile, benchmark_group_id, metadata_f, plot_type=plot_type)
+    function(
+        benchmarks,
+        pdf_filename,
+        PLOTPATH,
+        plotfile,
+        benchmark_group_id,
+        metadata_file,
+        plot_type=plot_type)
 
     plotfile.flush()
     plotfile.close()
