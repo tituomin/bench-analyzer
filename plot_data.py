@@ -22,6 +22,7 @@ from datafiles import read_datafiles, read_measurement_metadata
 import analysis
 from analysis import linear_fit, estimate_measuring_overhead
 import gnuplot
+import textualtable
 
 primitive_types = [
     t['java']
@@ -248,7 +249,6 @@ def plot(
             headers, rows, plotpath, gnuplot_script,
             title, specs, style, plot.page, axes_label)
 
-        import textualtable
         metadata_file.write("\n\n{0} (Page {1})\n\n".format(title, plot.page))
 
         keyvalpairs = series.values()[0].values()[0]['fixed'].items() + [
@@ -602,11 +602,13 @@ if __name__ == '__main__':
     method = argv[0]
     measurement_path = os.path.normpath(argv[1])
     output_path = argv[2]
+
     limit = argv[3]
     if len(argv) > 4:
         pdfviewer = argv[4]
     else:
         pdfviewer = None
+
     if len(argv) == 6:
         group = (not argv[5] == "separate")
     else:
