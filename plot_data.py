@@ -615,9 +615,14 @@ if __name__ == '__main__':
         except IndexError:
             pass
 
-    print len(limited_measurements)
-    i = len(limited_measurements) - 20 + 1
-    for m in limited_measurements[-20:]:
+    if len(limited_measurements) > 20:
+        i = len(limited_measurements) - 20 + 1
+        splice = limited_measurements[-20:]
+    else:
+        i = 1
+        splice = limited_measurements
+
+    for m in splice:
         b = m[0]
         warning = ""
         if int(b.get('rounds')) == 0:
