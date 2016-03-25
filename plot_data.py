@@ -713,21 +713,17 @@ if __name__ == '__main__':
     benchmark_group_id = str(uuid.uuid4())
     plot_prefix = 'plot-{0}'.format(benchmark_group_id)
 
-    pdffilename = os.path.join(output_path, plot_prefix + '.pdf')
-    plotfilename = plot_prefix + '.gp'
+    pdf_filename = os.path.join(output_path, plot_prefix + '.pdf')
+    plot_filename = plot_prefix + '.gp'
 
-    plotfile = open(os.path.join(output_path, plotfilename), 'w')
+    plotfile = open(os.path.join(output_path, plot_filename), 'w')
     metadata_f = open(os.path.join(output_path, plot_prefix + '-metadata.txt'), 'w')
 
+    measurement_ids = " ".join(ids)
     metadata_f.write("id: {0}\n".format(benchmark_group_id))
-    metadata_f.write("measurements: {0}\n".format(" ".join(ids)))
+    metadata_f.write("measurements: {0}\n".format(measurement_ids))
 
     preprocess_benchmarks(benchmarks, global_values)
-
-    if 'curves' in method:
-        function = plot_benchmarks
-    elif 'distributions' in method:
-        function = plot_distributions
 
     animate = False
     if pdfviewer == 'anim':
@@ -738,8 +734,12 @@ if __name__ == '__main__':
         pdfviewer = None
     else:
         plot_type = None
-    
-    function(benchmarks, pdffilename, PLOTPATH, plotfile, benchmark_group_id, metadata_f, plot_type=plot_type)
+
+    if 'curves' in method:
+        function = plot_benchmarks
+    elif 'distributions' in method:
+        function = plot_distributions
+    function(benchmarks, pdf_filename, PLOTPATH, plotfile, benchmark_group_id, metadata_f, plot_type=plot_type)
 
     plotfile.flush()
     plotfile.close()
@@ -747,10 +747,10 @@ if __name__ == '__main__':
         print "Press enter to start animation."
     call(["gnuplot", plotfile.name])
     if pdfviewer:
-        call([pdfviewer, str(pdffilename)])
+        call([pdfviewer, str(pdf_filename)])
     print "Final plot", 
     if 'animate' != plot_type:
-        print str(pdffilename)
+        print str(pdf_filename)
     else:
-        print str(plotfilename)
+        print str(plot_filename)
     exit(0)
