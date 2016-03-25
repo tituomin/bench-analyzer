@@ -37,23 +37,25 @@ types = reference_types + primitive_types
 
 plot_axes = {
     'description': 'Operation count',
-    'parameter_count' : 'Number of parameters',
-    'dynamic_size' : 'Size of object',
-    'direction' : 'Call direction',
-    'id' : 'Name of benchmark'
-    }
+    'parameter_count': 'Number of parameters',
+    'dynamic_size': 'Size of object',
+    'direction': 'Call direction',
+    'id': 'Name of benchmark'
+}
 pp = pprint.PrettyPrinter(depth=10, indent=4)
 
 debugdata = open('/tmp/debug.txt', 'w')
 
 directions = [
     "%s > %s" % (fr, to) for fr, to in
-    [('C', 'J'), ('J', 'C'), ('J', 'J'), ('C','C')]]
+    [('C', 'J'), ('J', 'C'), ('J', 'J'), ('C', 'C')]]
+
 
 def preprocess_benchmarks(benchmarks, global_values):
     for b in benchmarks:
         add_derived_values(b)
         add_global_values(b, global_values)
+
 
 def add_derived_values(benchmark):
     # migration - todo - remove
@@ -78,6 +80,7 @@ def add_derived_values(benchmark):
     benchmark['direction'] = '{f} > {t}'.format(f=benchmark['from'],
                                                 t=benchmark['to'])
     benchmark['single_type'] = single_type
+
 
 def add_global_values(benchmark, global_values):
     for key, val in global_values.iteritems():
@@ -110,7 +113,7 @@ def extract_data(benchmarks,
     sort_last = [group, variable, measure] + info
     controlled_variables = all_keys - set(sort_last)
     sorted_keys = list(controlled_variables) + sort_last
- 
+
     sorted_benchmarks = sorted(
         benchmarks,
         cmp=functools.partial(comp_function, sorted_keys))
@@ -121,7 +124,7 @@ def extract_data(benchmarks,
     #      - plots (list of individual data series ie. plots)
     #        - multiple measurements ()
     benchmarks = group_by_keys(sorted_benchmarks, controlled_variables)
-    for i, x  in enumerate(benchmarks):
+    for i, x in enumerate(benchmarks):
         benchmarks[i] = group_by_keys(x, [group])
         for j, y in enumerate(benchmarks[i]):
             benchmarks[i][j] = group_by_keys(y, [variable])
@@ -139,37 +142,38 @@ def extract_data(benchmarks,
 
             compatibles[j] = odict(
                 (benchmark[variable], {
-                        'fixed'    : dict((key, benchmark[key]) for key in controlled_variables),
-                        'info'     : dict((key, benchmark[key]) for key in info),
-                        'variable' : variable,
-                        'measure'  : measure,
-                        'group'    : group,
-                        variable   : benchmark[variable],
-                        measure    : benchmark[measure],
-                        group      : benchmark[group]
-                        }) for benchmark in plotgroups)
+                    'fixed': dict((key, benchmark[key]) for key in controlled_variables),
+                    'info': dict((key, benchmark[key]) for key in info),
+                    'variable': variable,
+                    'measure': measure,
+                    'group': group,
+                    variable: benchmark[variable],
+                    measure: benchmark[measure],
+                    group: benchmark[group]
+                }) for benchmark in plotgroups)
 
         benchmarks[i] = odict(
             sorted(((bms.values()[0][group], bms)
                     for bms in benchmarks[i]),
-                   key=lambda x:x[0]))
+                   key=lambda x: x[0]))
 
     return [x for x in benchmarks
             if len((x.values())[0]) >= min_series_length]
 
+
 def group_by_keys(sorted_benchmarks, keyset):
     # todo make into generator?
     return [
-        list(y) for x,y in groupby(
+        list(y) for x, y in groupby(
             sorted_benchmarks,
             key=lambda b: [b[k] for k in keyset])]
-    
+
+
 def aggregate_measurements(benchmarks, measure, stat_fun=min):
     values = []
     benchmark = None
     for benchmark in benchmarks:
         values.append(benchmark[measure])
-
 
     benchmark[measure] = stat_fun(values)
 
@@ -180,6 +184,7 @@ def aggregate_measurements(benchmarks, measure, stat_fun=min):
 
     return benchmark
 
+
 def comp_function(keys, left, right):
     for key in keys:
         if key not in left and key not in right:
@@ -189,18 +194,20 @@ def comp_function(keys, left, right):
             return -1
         if l > r:
             return 1
-    return 0        
+    return 0
+
 
 def without(keys, d):
     if keys == None:
         return d
     return dict(((key, val) for key, val in d.iteritems() if key not in keys))
 
+
 def plot(
-    benchmarks, gnuplot_script, plotpath, metadata_file,
-    keys_to_remove=None, select_predicate=None,
-    group=None, variable=None, measure=None,
-    title=None, style=None, min_series_width=1):
+        benchmarks, gnuplot_script, plotpath, metadata_file,
+        keys_to_remove=None, select_predicate=None,
+        group=None, variable=None, measure=None,
+        title=None, style=None, min_series_width=1):
 
     filtered_benchmarks = [
         without(keys_to_remove, x)
@@ -220,10 +227,10 @@ def plot(
     print 'Plotting', title
 
     specs = {
-        'group'            : group,
-        'variable'         : variable, 
-        'measure'          : measure}
-    
+        'group': group,
+        'variable': variable,
+        'measure': measure}
+
     data = extract_data(filtered_benchmarks, **specs)
 
     for series in data:
@@ -249,11 +256,12 @@ def plot(
             ('measure', measure),
             ('grouping', group)]
 
-        for k,v in keyvalpairs:
-             if v != None:
-                 metadata_file.write("{k:<25} {v}\n".format(k=k, v=v))
+        for k, v in keyvalpairs:
+            if v != None:
+                metadata_file.write("{k:<25} {v}\n".format(k=k, v=v))
 
-        metadata_file.write("\n" + textualtable.make_textual_table(headers, rows))
+        metadata_file.write(
+            "\n" + textualtable.make_textual_table(headers, rows))
 
         if variable != 'direction' and variable != 'id':
             x, polys, residuals = linear_fit(rows)
@@ -262,7 +270,8 @@ def plot(
             for i, xval in enumerate(x):
                 current = [xval]
                 current.extend(rows[i][1:])
-                current.extend([numpy.polyval(polys[j], xval) for j in range(0, len(rows[i]) - 1)])
+                current.extend([numpy.polyval(polys[j], xval)
+                                for j in range(0, len(rows[i]) - 1)])
                 fitted_curves.append(current)
 
             plot.page += 1
@@ -270,10 +279,12 @@ def plot(
                 headers + headers[1:], fitted_curves, plotpath, gnuplot_script,
                 title, specs, 'fitted_lines', plot.page, axes_label)
 
-            metadata_file.write("\nresiduals:\n" + textualtable.make_textual_table(headers[1:], [residuals]))
+            metadata_file.write(
+                "\nresiduals:\n" + textualtable.make_textual_table(headers[1:], [residuals]))
     return data
 
 plot.page = 0
+
 
 def make_table(series, group, variable, measure, axes_label):
     all_benchmark_variables_set = set()
@@ -288,7 +299,7 @@ def make_table(series, group, variable, measure, axes_label):
         [axes_label] +
         [k for k in series.iterkeys()]
     )
-    
+
     for v in all_benchmark_variables:
         row = []
         row.append(v)
@@ -297,31 +308,34 @@ def make_table(series, group, variable, measure, axes_label):
         rows.append(row)
 
     if variable == 'id':
-        rows = sorted(rows, key=lambda x:x[1] or -1)
+        rows = sorted(rows, key=lambda x: x[1] or -1)
 
     return headers, rows
 
+
 def binned_value(minimum, width, value):
     return width * (int(value - minimum) / int(width)) + minimum
-    
+
+
 def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None):
 
-    output_type='screen'
+    output_type = 'screen'
     if plot_type != 'animate':
-        output_type='pdf'
+        output_type = 'pdf'
 
     gnuplot.init(gnuplotcommands, output, bid, output=output_type)
     measure = 'response_time'
 
-    keyset = set(all_benchmarks[0].keys()) - set([measure, 'lineno', 'start', 'end'])
+    keyset = set(all_benchmarks[0].keys()) - \
+        set([measure, 'lineno', 'start', 'end'])
     comparison_function = functools.partial(comp_function, keyset)
     sorted_benchmarks = sorted(all_benchmarks, cmp=comparison_function)
 
     for group in group_by_keys(sorted_benchmarks, keyset):
         if plot_type != None:
-            keyf=lambda x:x['lineno']
+            keyf = lambda x: x['lineno']
         else:
-            keyf=lambda x:x[measure]
+            keyf = lambda x: x[measure]
 
         frame_count = 1
         if plot_type != None:
@@ -334,8 +348,8 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
             if current_frame == frame_count:
                 frame_ratio = 1
             else:
-                frame_ratio = float(current_frame)/frame_count
-            values = array(all_values[0:int(frame_ratio*len(all_values))])
+                frame_ratio = float(current_frame) / frame_count
+            values = array(all_values[0:int(frame_ratio * len(all_values))])
 
             bin_width = 500
             min_x = numpy.amin(all_values)
@@ -349,9 +363,9 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
             min_x = mode - 100000
             max_x = mode + 100000
 
-
             if current_frame == frame_count:
-                metadata_file.write('Direction {0}\n'.format(group[0]['direction']))
+                metadata_file.write(
+                    'Direction {0}\n'.format(group[0]['direction']))
                 # for val in sorted(counts.itervalues(), key=lambda x:-x['count'])[0:20]:
                 #     metadata_file.write("{:>12} {:>12} {:>12}\n".format(
                 #             val['limit'], val['percent'], val['count']))
@@ -362,8 +376,9 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
 
                 gnuplotcommands.write(
                     gnuplot.templates['binned_init'].format(
-                        title='%s %s' % (group[0]['id'], group[0]['direction']),
-                        binwidth=bin_edges[1]-bin_edges[0], min_x=min_x, max_x=max_x,
+                        title='%s %s' % (group[0]['id'], group[
+                                         0]['direction']),
+                        binwidth=bin_edges[1] - bin_edges[0], min_x=min_x, max_x=max_x,
                         max_y=numpy.max(hgram)))
 
                 if plot_type == 'animate':
@@ -377,19 +392,19 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
             if plot_type == None:
                 gnuplotcommands.write(
                     gnuplot.templates['binned_frame'].format(
-                        datapoints = '', color='#000033',
-                        values = '\n'.join(['{} {} {}'.format(val, count, val) for val, count in zip(bin_edges, hgram)])))
+                        datapoints='', color='#000033',
+                        values='\n'.join(['{} {} {}'.format(val, count, val) for val, count in zip(bin_edges, hgram)])))
 
             elif plot_type == 'gradient':
                 gnuplotcommands.write(
                     gnuplot.templates['binned_frame'].format(
-                        datapoints = '',
-                        color = gnuplot.hex_color_gradient((125,0,0), (255,255,0), 1-frame_ratio),
-                        values = '\n'.join(['{} {} {}'.format(val, count, val) for val, count in zip(bin_edges, hgram)])))
+                        datapoints='',
+                        color=gnuplot.hex_color_gradient(
+                            (125, 0, 0), (255, 255, 0), 1 - frame_ratio),
+                        values='\n'.join(['{} {} {}'.format(val, count, val) for val, count in zip(bin_edges, hgram)])))
 
         gnuplotcommands.write("set xtics\n")
         gnuplotcommands.write("set ytics\n")
-                
 
 
 def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None):
@@ -402,7 +417,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
 
     type_counts = ["parameter_type_{t}_count".format(t=tp) for tp in types]
     keys_to_remove = type_counts[:]
-    keys_to_remove.extend(['parameter_type_count', 'single_type', 'dynamic_variation'])
+    keys_to_remove.extend(
+        ['parameter_type_count', 'single_type', 'dynamic_variation'])
 
     defaults = [benchmarks, gnuplotcommands, plotpath]
 
@@ -413,14 +429,14 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
             overhead_estimates[from_lang] = {}
             overhead_data = plot(
                 custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
-                style = 'simple_groups',
-                title = 'Measuring overhead',
-                keys_to_remove = [],
-                select_predicate = (
+                style='simple_groups',
+                title='Measuring overhead',
+                keys_to_remove=[],
+                select_predicate=(
                     lambda x: x['from'] == from_lang and loop_type in x['id']),
-                group = 'from',
-                measure = 'response_time',
-                variable = 'description')
+                group='from',
+                measure='response_time',
+                variable='description')
 
             if overhead_data == None:
                 continue
@@ -438,46 +454,45 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
     for i, ptype in enumerate(types):
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
-            title = ptype,
-            style = 'simple_groups',
-            keys_to_remove = keys_to_remove + ['dynamic_size'],
-            select_predicate = lambda x: (
+            title=ptype,
+            style='simple_groups',
+            keys_to_remove=keys_to_remove + ['dynamic_size'],
+            select_predicate=lambda x: (
                 x['single_type'] in [ptype, 'any'] and
                 x['dynamic_size'] == 0),
-            group = 'direction',
-            variable = 'parameter_count',
-            measure = 'response_time')
+            group='direction',
+            variable='parameter_count',
+            measure='response_time')
 
     for direction in directions:
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
-            title = 'Dynamic size: parameters, direction ' + direction,
-            style = 'simple_groups',
-            keys_to_remove = type_counts,
-            select_predicate = (
+            title='Dynamic size: parameters, direction ' + direction,
+            style='simple_groups',
+            keys_to_remove=type_counts,
+            select_predicate=(
                 lambda x: (
                     x['direction'] == direction and
                     x['has_reference_types'] == 1 and
                     x['single_type'] in reference_types and
                     x['parameter_count'] == 1)),
-            group = 'single_type',
-            variable = 'dynamic_size',
-            measure = 'response_time')
+            group='single_type',
+            variable='dynamic_size',
+            measure='response_time')
 
     for direction in directions:
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
-            title = 'Dynamic size: return types, direction ' + direction,
-            style = 'simple_groups',
-            keys_to_remove = type_counts,
-            select_predicate = (
+            title='Dynamic size: return types, direction ' + direction,
+            style='simple_groups',
+            keys_to_remove=type_counts,
+            select_predicate=(
                 lambda x: x['has_reference_types'] == 1
-                and x['direction'] == direction 
+                and x['direction'] == direction
                 and x['return_type'] != 'void'),
-            group = 'return_type',
-            variable = 'dynamic_size',
-            measure = 'response_time')
-
+            group='return_type',
+            variable='dynamic_size',
+            measure='response_time')
 
     keys_to_remove = type_counts[:]
     keys_to_remove.append('has_reference_types')
@@ -486,75 +501,74 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
     for direction in directions:
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
-            style = 'simple_groups',
-            title = 'Type grouping ' + direction,
-            keys_to_remove = keys_to_remove,
-            select_predicate = (
+            style='simple_groups',
+            title='Type grouping ' + direction,
+            keys_to_remove=keys_to_remove,
+            select_predicate=(
                 lambda x: x['direction'] == direction),
-            group = 'single_type',
-            variable = 'parameter_count',
-            measure = 'response_time')
-    
+            group='single_type',
+            variable='parameter_count',
+            measure='response_time')
 
     plot(
         benchmarks, gnuplotcommands, plotpath, metadata_file,
-        style = 'named_columns',
-        title = 'Return types',
-        keys_to_remove = ['has_reference_types', 'dynamic_variation'],
-        select_predicate = (
+        style='named_columns',
+        title='Return types',
+        keys_to_remove=['has_reference_types', 'dynamic_variation'],
+        select_predicate=(
             lambda x: x['dynamic_size'] == 0 and
             x['return_type'] != 'void'),
-        group = 'return_type',
-        measure = 'response_time',
-        variable = 'direction',
-        min_series_width = 2)
+        group='return_type',
+        measure='response_time',
+        variable='direction',
+        min_series_width=2)
     # had: sort 'response_time', min_series_width: 2 , unused?
 
     for direction in directions:
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
-            style = 'simple_groups',
-            title = 'Custom, dynamic ' + direction,
-            select_predicate = (
+            style='simple_groups',
+            title='Custom, dynamic ' + direction,
+            select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
                            'ArrayRegion' not in x['id'] and
                            'Overhead' not in x['id'])),
-            group = 'id',
-            measure = 'response_time',
-            variable = 'dynamic_size')
+            group='id',
+            measure='response_time',
+            variable='dynamic_size')
 
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
-            style = 'simple_groups',
-            title = 'Custom, dynamic ' + direction,
-            select_predicate = (
+            style='simple_groups',
+            title='Custom, dynamic ' + direction,
+            select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
                            'ArrayRegion' in x['id'] and
                            'Overhead' not in x['id'])),
-            group = 'id',
-            measure = 'response_time',
-            variable = 'dynamic_size')
+            group='id',
+            measure='response_time',
+            variable='dynamic_size')
 
     plot(
         custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
-        style = 'histogram',
-        title = 'Custom, non-dynamic',
-        select_predicate = (
+        style='histogram',
+        title='Custom, non-dynamic',
+        select_predicate=(
             lambda x: (
                 x['dynamic_variation'] == 0 and
                 'Overhead' not in x['id'])),
-        group = 'direction',
-        measure = 'response_time',
-        variable = 'id')
+        group='direction',
+        measure='response_time',
+        variable='id')
 
-        
 
 MEASUREMENT_FILE = 'measurements.txt'
 DEVICE_PATH = '/sdcard/results'
 PLOTPATH = '/tmp'
 TOOL_NAMESPACE = 'fi.helsinki.cs.tituomin.nativebenchmark.measuringtool'
+
 
 def sync_measurements(dev_path, host_path, filename, update=True):
     old_path = host_path + '/' + filename
@@ -564,7 +578,7 @@ def sync_measurements(dev_path, host_path, filename, update=True):
         return
 
     success = call(['adb', 'pull',
-                    dev_path  + '/' + filename,
+                    dev_path + '/' + filename,
                     tmp_path])
     if success == 0:
         if os.path.exists(old_path):
@@ -646,32 +660,32 @@ if __name__ == '__main__':
                            dates: {first} -
                                   {last}
     """.format(
-        local   = b.get('id') in csv_files,
-        num     = len(m),
-        mid     = b.get('id'),
-        idx     = i,
-        warning = warning,
-        last    = m[-1]['end'],
-        rounds  = reduce(lambda x,y: y+x, [int(b['rounds']) for b in m]),
-        reps    = b.get('repetitions'),
-        ck      = b.get('code-checksum'),
-        rev     = b.get('code-revision'),
-        tool    = b.get('tool'),
-        freq    = b.get('cpu-freq'),
-        bset    = b.get('benchmark-set'),
-        desc    = b.get('description'),
-        sfilter = b.get('substring-filter'),
-        first   = b.get('start')
+            local=b.get('id') in csv_files,
+            num=len(m),
+            mid=b.get('id'),
+            idx=i,
+            warning=warning,
+            last=m[-1]['end'],
+            rounds=reduce(lambda x, y: y + x, [int(b['rounds']) for b in m]),
+            reps=b.get('repetitions'),
+            ck=b.get('code-checksum'),
+            rev=b.get('code-revision'),
+            tool=b.get('tool'),
+            freq=b.get('cpu-freq'),
+            bset=b.get('benchmark-set'),
+            desc=b.get('description'),
+            sfilter=b.get('substring-filter'),
+            first=b.get('start')
         )
- 
+
         i += 1
 
     try:
-        response = raw_input("Choose set 1-{last} >> ".format(last=i-1))
+        response = raw_input("Choose set 1-{last} >> ".format(last=i - 1))
     except EOFError:
         print 'Exiting.'
         exit(1)
-    
+
     benchmark_group = limited_measurements[int(response) - 1]
 
     filenames = []
@@ -684,13 +698,15 @@ if __name__ == '__main__':
             basename = "benchmarks-{n}.csv"
         filenames.append(
             basename.format(n=measurement['id']))
-        if 'logfile' in measurement: filenames.append(measurement['logfile'])
+        if 'logfile' in measurement:
+            filenames.append(measurement['logfile'])
         ids.append(measurement['id'])
         multiplier += int(measurement['rounds'])
 
     files = []
     for filename in filenames:
-        sync_measurements(DEVICE_PATH, measurement_path, filename, update=False)
+        sync_measurements(DEVICE_PATH, measurement_path,
+                          filename, update=False)
         if filename not in [m.get('logfile') for m in benchmark_group]:
             files.append(open(os.path.join(measurement_path, filename)))
 
@@ -698,7 +714,7 @@ if __name__ == '__main__':
 
     global_values = {
         'repetitions': first_measurement['repetitions'],
-        'multiplier' : multiplier
+        'multiplier': multiplier
     }
 
     try:
@@ -718,7 +734,8 @@ if __name__ == '__main__':
     plot_filename = plot_prefix + '.gp'
 
     plotfile = open(os.path.join(output_path, plot_filename), 'w')
-    metadata_file = open(os.path.join(output_path, plot_prefix + '-metadata.txt'), 'w')
+    metadata_file = open(os.path.join(
+        output_path, plot_prefix + '-metadata.txt'), 'w')
 
     measurement_ids = " ".join(ids)
     metadata_file.write("id: {0}\n".format(benchmark_group_id))
@@ -756,7 +773,7 @@ if __name__ == '__main__':
     call(["gnuplot", plotfile.name])
     if pdfviewer:
         call([pdfviewer, str(pdf_filename)])
-    print "Final plot", 
+    print "Final plot",
     if 'animate' != plot_type:
         print str(pdf_filename)
     else:
