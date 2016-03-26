@@ -209,7 +209,8 @@ def plot(
         benchmarks, gnuplot_script, plotpath, metadata_file,
         keys_to_remove=None, select_predicate=None,
         group=None, variable=None, measure=None,
-        title=None, style=None, min_series_width=1):
+        title=None, style=None, min_series_width=1,
+        revision=None, checksum=None):
 
     filtered_benchmarks = [
         without(keys_to_remove, x)
@@ -264,6 +265,23 @@ def plot(
         metadata_file.write(
             "\n" + textualtable.make_textual_table(headers, rows))
 
+        id_headers, id_rows = make_table(
+            series, group, variable, 'class', axes_label)
+
+        def make_id(variable_value, item, variable):
+            ret = "/".join([revision, checksum, item or '-'])
+            if variable == 'dynamic_size':
+                ret += "/" + str(variable_value)
+            return ret
+
+        id_rows = [
+            [row[0]] +
+            [make_id(row[0], item, variable) for item in row[1:]]
+            for row in id_rows]
+
+        ttable = textualtable.make_textual_table(id_headers, id_rows)
+        metadata_file.write("\n" + ttable)
+
         if variable != 'direction' and variable != 'id':
             x, polys, residuals = linear_fit(rows)
 
@@ -305,7 +323,10 @@ def make_table(series, group, variable, measure, axes_label):
         row = []
         row.append(v)
         for key, grp in series.iteritems():
-            row.append(grp.get(v, {}).get(measure, None))
+            val = grp.get(v, {}).get(measure, None)
+            if val is None:
+                val = grp.get(v, {}).get('info', {}).get(measure, None)
+            row.append(val)
         rows.append(row)
 
     if variable == 'id':
@@ -318,7 +339,7 @@ def binned_value(minimum, width, value):
     return width * (int(value - minimum) / int(width)) + minimum
 
 
-def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None):
+def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None, **kwargs):
 
     output_type = 'screen'
     if plot_type != 'animate':
@@ -408,7 +429,10 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
         gnuplotcommands.write("set ytics\n")
 
 
-def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None):
+def plot_benchmarks(
+        all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file,
+        plot_type=None, revision=None, checksum=None):
+
     gnuplot.init(gnuplotcommands, output, bid)
 
     #all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
@@ -434,10 +458,11 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 title='Measuring overhead',
                 keys_to_remove=[],
                 select_predicate=(
-                    lambda x: x['from'] == from_lang and loop_type in x['id']),
+                        lambda x: x['from'] == from_lang and loop_type in x['id']),
                 group='from',
                 measure='response_time',
-                variable='description')
+                variable='description',
+                revision=revision, checksum=checksum)
 
             if overhead_data == None:
                 continue
@@ -446,8 +471,11 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 exit(1)
 
             series = overhead_data[0]
-            headers, rows = make_table(
-                series, 'from', 'description', 'response_time', 'workload')
+            headers, rows = make_table(series,
+                                       'from',
+                                       'description',
+                                       'response_time',
+                                       'workload')
             est = estimate_measuring_overhead(rows[1:])
             overhead_estimates[from_lang][loop_type] = est[0]
             metadata_file.write('Overhead ' + from_lang + ' ' + str(est[0]))
@@ -463,7 +491,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 x['dynamic_size'] == 0),
             group='direction',
             variable='parameter_count',
-            measure='response_time')
+            measure='response_time',
+            revision=revision, checksum=checksum)
 
     for direction in directions:
         plot(
@@ -479,7 +508,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                     x['parameter_count'] == 1)),
             group='single_type',
             variable='dynamic_size',
-            measure='response_time')
+            measure='response_time',
+            revision=revision, checksum=checksum)
 
     for direction in directions:
         plot(
@@ -493,7 +523,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 and x['return_type'] != 'void'),
             group='return_type',
             variable='dynamic_size',
-            measure='response_time')
+            measure='response_time',
+            revision=revision, checksum=checksum)
 
     keys_to_remove = type_counts[:]
     keys_to_remove.append('has_reference_types')
@@ -509,7 +540,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 lambda x: x['direction'] == direction),
             group='single_type',
             variable='parameter_count',
-            measure='response_time')
+            measure='response_time',
+            revision=revision, checksum=checksum)
 
     plot(
         benchmarks, gnuplotcommands, plotpath, metadata_file,
@@ -522,7 +554,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
         group='return_type',
         measure='response_time',
         variable='direction',
-        min_series_width=2)
+        min_series_width=2,
+        revision=revision, checksum=checksum)
     # had: sort 'response_time', min_series_width: 2 , unused?
 
     for direction in directions:
@@ -537,7 +570,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                            'Overhead' not in x['id'])),
             group='id',
             measure='response_time',
-            variable='dynamic_size')
+            variable='dynamic_size',
+            revision=revision, checksum=checksum)
 
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
@@ -550,7 +584,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                            'Overhead' not in x['id'])),
             group='id',
             measure='response_time',
-            variable='dynamic_size')
+            variable='dynamic_size',
+            revision=revision, checksum=checksum)
 
     plot(
         custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
@@ -562,7 +597,8 @@ def plot_benchmarks(all_benchmarks, output, plotpath, gnuplotcommands, bid, meta
                 'Overhead' not in x['id'])),
         group='direction',
         measure='response_time',
-        variable='id')
+        variable='id',
+        revision=revision, checksum=checksum)
 
 
 MEASUREMENT_FILE = 'measurements.txt'
@@ -841,7 +877,9 @@ if __name__ == '__main__':
         plotfile,
         benchmark_group_id,
         metadata_file,
-        plot_type=plot_type)
+        plot_type=plot_type,
+        revision=first_measurement['code-revision'],
+        checksum=first_measurement['code-checksum'])
 
     plotfile.flush()
     plotfile.close()
