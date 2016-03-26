@@ -219,7 +219,7 @@ def plot(
     variables = set([benchmark[variable] for benchmark in filtered_benchmarks])
 
     if len(variables) < 2:
-        print 'Skipping plot without enough data variables', title, '\n'
+        print 'Skipping plot without enough data variables', title
         return
 
     if len(filtered_benchmarks) == 0:
