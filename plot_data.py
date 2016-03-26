@@ -611,7 +611,7 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
          m.get('tool') == 'LinuxPerfRecordTool')
 
     def match_measurement_run(m):
-        if m.get('class') != class_:
+        if m.get('class').lower() != class_.lower():
             return False
         if dynamic_size and m.get('dynamic_size') != int(dynamic_size):
             return False
