@@ -690,6 +690,7 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
 
     for f in datafiles:
         f['zip'].close()
+    print "Profile for identifier", identifier
     with open('/tmp/out.txt', 'r') as f:
         print f.read()
     exit(0)
