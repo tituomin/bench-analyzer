@@ -684,12 +684,14 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
     for record in matching_benchmarks:
         perf_file = record['zip'].extract('{}/{}'.format(record['mid'], record['filename']), '/tmp')
         try:
-            call(["perf report -i {} --symfs=/home/tituomin/droid-symbols --kallsyms=/home/tituomin/droid/linux-kernel/kallsyms".format(perf_file)], shell=True)
+            call(["perf report -i {} -g graph,0.9,caller -s parent --symfs=/home/tituomin/droid-symbols --kallsyms=/home/tituomin/droid/linux-kernel/kallsyms --stdio >/tmp/out.txt".format(perf_file)], shell=True)
         except OSError as e:
             print e.filename, e.message, e.args
 
     for f in datafiles:
         f['zip'].close()
+    with open('/tmp/out.txt', 'r') as f:
+        print f.read()
     exit(0)
 
 if __name__ == '__main__':
@@ -722,7 +724,6 @@ if __name__ == '__main__':
     finally:
         f.close()
 
-    print "\nAvailable compatible measurements. Choose one"
     limited_measurements = filter(lambda x: int(x[0].get('repetitions', 0)) >= int(limit),
                                   measurements.values())
 
@@ -746,6 +747,7 @@ if __name__ == '__main__':
         i = 1
         splice = limited_measurements
 
+    print "\nAvailable compatible measurements. Choose one"
     for m in splice:
         b = m[0]
         warning = ""
@@ -847,6 +849,7 @@ if __name__ == '__main__':
             output_path, plot_prefix + '-metadata.txt'), 'w')
 
         measurement_ids = " ".join(ids)
+        metadata_file.write("-*- mode: perf-report; -*-\n\n")
         metadata_file.write("id: {0}\n".format(benchmark_group_id))
         metadata_file.write("measurements: {0}\n".format(measurement_ids))
 
