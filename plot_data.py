@@ -269,7 +269,7 @@ def plot(
             series, group, variable, 'class', axes_label)
 
         def make_id(variable_value, item, variable):
-            ret = "/".join([revision, checksum, item or '-'])
+            ret = "/".join([revision, item or '-'])
             if variable == 'dynamic_size':
                 ret += "/" + str(variable_value)
             return ret
@@ -631,20 +631,19 @@ def sync_measurements(dev_path, host_path, filename, update=True):
 
 def render_perf_reports_for_measurement(identifier, measurements, measurement_path, output_path):
     path = identifier.split("/")
-    if len(path) < 3:
+    if len(path) < 2:
         print 'Invalid identifier {}'.format(identifier)
         exit(1)
-    if len(path) == 4:
-        revision, checksum, class_, dynamic_size = path
-    elif len(path) == 3:
-        revision, checksum, class_ = path
+    if len(path) == 3:
+        revision, class_, dynamic_size = path
+    elif len(path) == 2:
+        revision, class_ = path
         dynamic_size = None
 
     def match_measurement(measurement):
         m = measurement[0]
-        return (m.get('code-checksum') == checksum and
-         m.get('code-revision') == revision and
-         m.get('tool') == 'LinuxPerfRecordTool')
+        return (m.get('code-revision') == revision and
+                m.get('tool') == 'LinuxPerfRecordTool')
 
     def match_measurement_run(m):
         if m.get('class').lower() != class_.lower():
