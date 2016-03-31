@@ -704,11 +704,7 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
                 "--symfs=/home/tituomin/droid-symbols",
                 "--kallsyms=/home/tituomin/droid/linux-kernel/kallsyms"
             ]
-            if output_command:
-                command_parts.extend([
-                    "&& echo \"That was {}.\"".format(identifier)
-                ])
-            else:
+            if not output_command:
                 command_parts.extend([
                     "-g graph,0.9,caller",
                     "-s parent",
