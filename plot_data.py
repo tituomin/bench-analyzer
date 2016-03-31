@@ -9,6 +9,7 @@ import functools
 import pprint
 import re
 import os
+import sys
 import shutil
 import uuid
 
@@ -24,6 +25,8 @@ import analysis
 from analysis import linear_fit, estimate_measuring_overhead
 import gnuplot
 import textualtable
+
+FNULL = None
 
 primitive_types = [
     t['java']
@@ -614,9 +617,14 @@ def sync_measurements(dev_path, host_path, filename, update=True):
         print 'No sync necessary'
         return
 
+    kwargs = {}
+    if FNULL is not None:
+        kwargs['stdout'] = FNULL
+        kwargs['stderr'] = FNULL
+
     success = call(['adb', 'pull',
                     dev_path + '/' + filename,
-                    tmp_path])
+                    tmp_path], **kwargs)
     if success == 0:
         if os.path.exists(old_path):
             size_new = os.path.getsize(tmp_path)
@@ -629,7 +637,7 @@ def sync_measurements(dev_path, host_path, filename, update=True):
     else:
         print "Could not get new measurements, continuing with old."
 
-def render_perf_reports_for_measurement(identifier, measurements, measurement_path, output_path):
+def render_perf_reports_for_measurement(identifier, measurements, measurement_path, output_path, output_command=False):
     path = identifier.split("/")
     if len(path) < 2:
         print 'Invalid identifier {}'.format(identifier)
@@ -653,22 +661,28 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
         return True
 
     datafiles = []
-    for measurement in filter(match_measurement, measurements)[0:1]: #TODO: multiple?
+    for measurement in filter(match_measurement, measurements): #TODO: multiple?
         mid = measurement[0].get('id')
         zpath = os.path.join(measurement_path, 'perfdata-{}.zip'.format(mid))
-        measurement_zipfile = zipfile.ZipFile(zpath, 'r')
-        datafiles.append({
-            'zip': measurement_zipfile,
-            'mid': mid,
-            'csv': measurement_zipfile.open('{0}/benchmarks-{0}.csv'.format(mid))
-        })
+        try:
+            measurement_zipfile = zipfile.ZipFile(zpath, 'r')
+            datafiles.append({
+                'zip': measurement_zipfile,
+                'mid': mid,
+                'csv': measurement_zipfile.open('{0}/benchmarks-{0}.csv'.format(mid))
+            })
+        except zipfile.BadZipfile:
+            print 'Bad zip file %s' % zpath
+        except IOError as e:
+            print 'Problem with zip file %s' % zpath
+            print e
 
     benchmarks = []
     for df in datafiles:
         benchmarks.append({
             'zip': df['zip'],
             'mid': df['mid'],
-            'metadata': read_datafiles([df['csv']])
+            'metadata': read_datafiles([df['csv']], silent=output_command)
         })
 
     matching_benchmarks = []
@@ -684,7 +698,28 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
     for record in matching_benchmarks:
         perf_file = record['zip'].extract('{}/{}'.format(record['mid'], record['filename']), '/tmp')
         try:
-            call(["perf report -i {} -g graph,0.9,caller -s parent --symfs=/home/tituomin/droid-symbols --kallsyms=/home/tituomin/droid/linux-kernel/kallsyms --stdio >/tmp/out.txt".format(perf_file)], shell=True)
+            command_parts = [
+                "perf report",
+                "-i {}",
+                "--symfs=/home/tituomin/droid-symbols",
+                "--kallsyms=/home/tituomin/droid/linux-kernel/kallsyms"
+            ]
+            if output_command:
+                command_parts.extend([
+                    "&& echo \"That was {}.\"".format(identifier)
+                ])
+            else:
+                command_parts.extend([
+                    "-g graph,0.9,caller",
+                    "-s parent",
+                    "--stdio >/tmp/out.txt"
+                ])
+            command = " ".join(command_parts).format(perf_file)
+            if output_command:
+                print command
+                exit(0)
+            else:
+                call([command], shell=True)
         except OSError as e:
             print e.filename, e.message, e.args
 
@@ -701,9 +736,16 @@ if __name__ == '__main__':
         print "\n    Usage: %s input_path output_path limit [pdfviewer] [separate]\n".format(argv[0])
         exit(1)
 
+    FNULL = open(os.devnull, 'w')
+
     method = argv[0]
     measurement_path = os.path.normpath(argv[1])
     output_path = argv[2]
+
+    output_command = False
+    if len(argv) > 5:
+        if argv[5] == 'show-command':
+            output_command = True
 
     limit = argv[3]
     if len(argv) > 4:
@@ -715,6 +757,12 @@ if __name__ == '__main__':
         group = (not argv[5] == "separate")
     else:
         group = True
+
+    if output_command:
+        system_stdout = sys.stdout
+        system_stderr = sys.stderr
+        sys.stdout = FNULL
+        sys.stderr = FNULL
 
     sync_measurements(DEVICE_PATH, measurement_path, MEASUREMENT_FILE)
 
@@ -731,7 +779,11 @@ if __name__ == '__main__':
     # ID = revision/checksum/class[/dynamic_size]
     if 'perf_select' in method:
         identifier = argv[4]
-        render_perf_reports_for_measurement(identifier, limited_measurements, measurement_path, output_path)
+        if output_command:
+            sys.stdout = system_stdout
+            sys.stderr = system_stderr
+            FNULL.close()
+        render_perf_reports_for_measurement(identifier, limited_measurements, measurement_path, output_path, output_command=output_command)
         exit(0)
 
     csv_files = set()
@@ -870,7 +922,7 @@ if __name__ == '__main__':
         function = plot_benchmarks
     elif 'distributions' in method:
         function = plot_distributions
-    if not function:
+    if perf or not function:
         exit(0)
 
     function(

@@ -2,6 +2,7 @@
 
 import re
 from collections import OrderedDict as odict
+import sys
 
 SEPARATOR = ','
 RE_EMPTY = re.compile('^\s*$')
@@ -29,8 +30,9 @@ def empty_label():
 
 empty_label.cnt = 0
 
-def read_datafiles(files):
-    print 'Reading from %s files' % len(files)
+def read_datafiles(files, silent=False):
+    if not silent:
+        print 'Reading from %s files' % len(files)
     benchmarks = []
     #-1: there is an empty field at the end...
 
@@ -86,7 +88,8 @@ def read_datafiles(files):
             print "Benchmarks have different amount of data", benchmark_keycount, current_keycount, "at line", benchmark['lineno']
             exit(1)
 
-    print 'Read %d lines' % (lineno - 1)
+    if not silent:
+        print 'Read %d lines' % (lineno - 1)
     return benchmarks
 
 def read_measurement_metadata(mfile, combine_compatibles):
