@@ -3,22 +3,29 @@
 import os
 import uuid
 
-init_plots_pdf = """
+INIT_PLOTS_PDF = """
 set terminal pdfcairo size 32cm,18cm
 set output '{filename}'
 """
 
-init_plots_gp = """
+INIT_PLOTS_LATEX = """
+set terminal epslatex color
+"""
+
+INIT_PLOTS_COMMON = """
 set key outside
 set size 1, 0.95
 set xlabel "Number of parameters"
-set ylabel "Response time (ms)"
+set ylabel "Response time"
+"""
+
+INIT_PLOT_LABEL_PDF = """
 set label 1 "{bid}" at graph 0.01, graph 1.06
 """
 
-templates = {}
+TEMPLATES = {}
 
-templates['binned_init'] = """
+TEMPLATES['binned_init'] = """
 set title '{title}
 binwidth={binwidth}
 set boxwidth binwidth
@@ -29,7 +36,7 @@ set yrange [0:{max_y}]
 # border lt -1
 #bin(x,width)=width*floor(x/width) + width/2.0
 
-templates['binned_frame'] = """
+TEMPLATES['binned_frame'] = """
 #set label 2 "{datapoints}" at graph 0.8, graph 1.06
 set bmargin 20
 set tmargin 20
@@ -44,14 +51,14 @@ unset xtics
 unset ytics
 """
 
-templates['simple_groups'] = """
+TEMPLATES['simple_groups'] = """
 set title '{title}'
 set label 2 "page {page}" at screen 0.9, screen 0.95
 set xlabel "{xlabel}"
 plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with linespoints
 """
 
-templates['fitted_lines'] = """
+TEMPLATES['fitted_lines'] = """
 set title '{title}'
 set label 2 "page {page}" at screen 0.9, screen 0.95
 set xlabel "{xlabel}"
@@ -59,7 +66,7 @@ plot for [I=2:{last_real_column}] '{filename}' index {index} using 1:I title col
 for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I title columnhead with lines
 """
 
-templates['named_columns'] = """
+TEMPLATES['named_columns'] = """
 set yrange [-500:*]
 set title '{title}'
 set label 2 "page {page}" at screen 0.9, screen 0.95
@@ -67,7 +74,7 @@ set xlabel "{xlabel}"
 plot for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title columnhead with linespoints
 """
 
-templates['histogram'] = """
+TEMPLATES['histogram'] = """
 set title '{title}'
 set label 2 "page {page}" at screen 0.9, screen 0.95
 set xlabel "{xlabel}"
@@ -82,13 +89,15 @@ plot [] [{miny}:*] for [I=2:{last_column}] '{filename}' index {index} using I:xt
 
 def init(plotscript, filename, measurement_id, output='pdf'):
     if output == 'pdf':
-        plotscript.write(init_plots_pdf.format(filename=filename))
-    plotscript.write(init_plots_gp.format(bid=measurement_id))
+        plotscript.write(INIT_PLOTS_PDF.format(filename=filename))
+        plotscript.write(INIT_PLOT_LABEL_PDF.format(bid=measurement_id))
+    elif output == 'latex':
+        plotscript.write(INIT_PLOTS_LATEX)
+    plotscript.write(INIT_PLOTS_COMMON)
 
+def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, style, page, xlabel, additional_data=None, latex=False):
 
-def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, style, page, xlabel, additional_data=None):
-
-    template = templates[style]
+    template = TEMPLATES[style]
 
     if plotpath:
         # external data

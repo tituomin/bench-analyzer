@@ -342,7 +342,7 @@ def binned_value(minimum, width, value):
     return width * (int(value - minimum) / int(width)) + minimum
 
 
-def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None, **kwargs):
+def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None, latex=False, **kwargs):
 
     output_type = 'screen'
     if plot_type != 'animate':
@@ -434,9 +434,13 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
 
 def plot_benchmarks(
         all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file,
-        plot_type=None, revision=None, checksum=None):
+        plot_type=None, revision=None, checksum=None, latex=False):
 
-    gnuplot.init(gnuplotcommands, output, bid)
+    output = 'pdf'
+    if latex:
+        output= 'latex'
+
+    gnuplot.init(gnuplotcommands, output, bid, output=output)
 
     #all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
 
@@ -738,6 +742,10 @@ if __name__ == '__main__':
     measurement_path = os.path.normpath(argv[1])
     output_path = argv[2]
 
+    if 'plotlatex' in method:
+        latex = True
+        method = 'curves'
+
     output_command = False
     if len(argv) > 5:
         if argv[5] == 'show-command':
@@ -890,7 +898,11 @@ if __name__ == '__main__':
         benchmark_group_id = str(uuid.uuid4())
         plot_prefix = 'plot-{0}'.format(benchmark_group_id)
 
-        pdf_filename = os.path.join(output_path, plot_prefix + '.pdf')
+
+        if latex:
+            output_filename = os.path.join(output_path, plot_prefix)
+        else:
+            output_filename = os.path.join(output_path, plot_prefix + '.pdf')
         plot_filename = plot_prefix + '.gp'
 
         plotfile = open(os.path.join(output_path, plot_filename), 'w')
@@ -923,14 +935,15 @@ if __name__ == '__main__':
 
     function(
         benchmarks,
-        pdf_filename,
+        output_filename,
         PLOTPATH,
         plotfile,
         benchmark_group_id,
         metadata_file,
         plot_type=plot_type,
         revision=first_measurement['code-revision'],
-        checksum=first_measurement['code-checksum'])
+        checksum=first_measurement['code-checksum'],
+        latex=latex)
 
     plotfile.flush()
     plotfile.close()
@@ -938,10 +951,10 @@ if __name__ == '__main__':
         print "Press enter to start animation."
     call(["gnuplot", plotfile.name])
     if pdfviewer:
-        call([pdfviewer, str(pdf_filename)])
+        call([pdfviewer, str(output_filename)])
     print "Final plot",
     if 'animate' != plot_type:
-        print str(pdf_filename)
+        print str(output_filename)
     else:
         print str(plot_filename)
     exit(0)
