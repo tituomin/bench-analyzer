@@ -101,6 +101,7 @@ def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, sty
 
     if plotpath:
         # external data
+        if late
         filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
         plotdata = open(filename, 'w')
         plotdata.write(print_benchmarks(data_headers, data_rows, title, **specs))
@@ -130,6 +131,9 @@ def output_plot(data_headers, data_rows, plotpath, plotscript, title, specs, sty
         plotscript.write(template.format(
            title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
            xlabel = xlabel, miny=miny))
+
+    if latex:
+        plotscript.write('')
 
     
 
