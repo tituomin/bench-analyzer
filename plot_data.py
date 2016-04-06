@@ -213,7 +213,7 @@ def plot(
         keys_to_remove=None, select_predicate=None,
         group=None, variable=None, measure=None,
         title=None, style=None, min_series_width=1,
-        revision=None, checksum=None):
+        revision=None, checksum=None, output='pdf'):
 
     filtered_benchmarks = [
         without(keys_to_remove, x)
@@ -252,7 +252,7 @@ def plot(
 
         gnuplot.output_plot(
             headers, rows, plotpath, gnuplot_script,
-            title, specs, style, plot.page, axes_label)
+            title, specs, style, plot.page, axes_label, output=output)
 
         metadata_file.write("\n\n{0} (Page {1})\n\n".format(title, plot.page))
 
@@ -299,7 +299,7 @@ def plot(
             plot.page += 1
             gnuplot.output_plot(
                 headers + headers[1:], fitted_curves, plotpath, gnuplot_script,
-                title, specs, 'fitted_lines', plot.page, axes_label)
+                title, specs, 'fitted_lines', plot.page, axes_label, output=output)
 
             metadata_file.write(
                 "\nresiduals:\n" + textualtable.make_textual_table(headers[1:], [residuals]))
@@ -348,7 +348,7 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
     if plot_type != 'animate':
         output_type = 'pdf'
 
-    gnuplot.init(gnuplotcommands, output, bid, output=output_type)
+    gnuplot.init(gnuplotcommands, output, bid, output_type=output_type)
     measure = 'response_time'
 
     keyset = set(all_benchmarks[0].keys()) - \
@@ -436,11 +436,11 @@ def plot_benchmarks(
         all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file,
         plot_type=None, revision=None, checksum=None, latex=False):
 
-    output = 'pdf'
+    output_type = 'pdf'
     if latex:
-        output= 'latex'
+        output_type = 'latex'
 
-    gnuplot.init(gnuplotcommands, output, bid, output=output)
+    gnuplot.init(gnuplotcommands, output, bid, output_type=output_type)
 
     #all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
 
@@ -469,7 +469,7 @@ def plot_benchmarks(
                 group='from',
                 measure='response_time',
                 variable='description',
-                revision=revision, checksum=checksum)
+                revision=revision, checksum=checksum, output=output_type)
 
             if overhead_data == None:
                 continue
@@ -499,7 +499,7 @@ def plot_benchmarks(
             group='direction',
             variable='parameter_count',
             measure='response_time',
-            revision=revision, checksum=checksum)
+            revision=revision, checksum=checksum, output=output_type)
 
     for direction in directions:
         plot(
@@ -516,7 +516,7 @@ def plot_benchmarks(
             group='single_type',
             variable='dynamic_size',
             measure='response_time',
-            revision=revision, checksum=checksum)
+            revision=revision, checksum=checksum, output=output_type)
 
     for direction in directions:
         plot(
@@ -531,7 +531,7 @@ def plot_benchmarks(
             group='return_type',
             variable='dynamic_size',
             measure='response_time',
-            revision=revision, checksum=checksum)
+            revision=revision, checksum=checksum, output=output_type)
 
     keys_to_remove = type_counts[:]
     keys_to_remove.append('has_reference_types')
@@ -548,7 +548,7 @@ def plot_benchmarks(
             group='single_type',
             variable='parameter_count',
             measure='response_time',
-            revision=revision, checksum=checksum)
+            revision=revision, checksum=checksum, output=output_type)
 
     plot(
         benchmarks, gnuplotcommands, plotpath, metadata_file,
@@ -562,7 +562,7 @@ def plot_benchmarks(
         measure='response_time',
         variable='direction',
         min_series_width=2,
-        revision=revision, checksum=checksum)
+        revision=revision, checksum=checksum, output=output_type)
     # had: sort 'response_time', min_series_width: 2 , unused?
 
     for direction in directions:
@@ -578,7 +578,7 @@ def plot_benchmarks(
             group='id',
             measure='response_time',
             variable='dynamic_size',
-            revision=revision, checksum=checksum)
+            revision=revision, checksum=checksum, output=output_type)
 
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
@@ -592,7 +592,7 @@ def plot_benchmarks(
             group='id',
             measure='response_time',
             variable='dynamic_size',
-            revision=revision, checksum=checksum)
+            revision=revision, checksum=checksum, output=output_type)
 
     plot(
         custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
@@ -605,7 +605,7 @@ def plot_benchmarks(
         group='direction',
         measure='response_time',
         variable='id',
-        revision=revision, checksum=checksum)
+        revision=revision, checksum=checksum, output=output_type)
 
 
 MEASUREMENT_FILE = 'measurements.txt'
