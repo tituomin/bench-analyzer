@@ -1,22 +1,54 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 import os
 import uuid
 
+INIT_PALETTE = """
+# line styles for ColorBrewer Dark2
+# for use with qualitative/categorical data
+# provides 8 dark colors based on Set2
+# compatible with gnuplot >=4.2
+# author: Anna Schneider
+
+# line styles
+set style line 1 pt 7 lt 1 lc rgb '#1B9E77' # dark teal
+set style line 2 pt 7 lt 1 lc rgb '#D95F02' # dark orange
+set style line 3 pt 7 lt 1 lc rgb '#7570B3' # dark lilac
+set style line 4 pt 7 lt 1 lc rgb '#E7298A' # dark magenta
+set style line 5 pt 7 lt 1 lc rgb '#66A61E' # dark lime green
+set style line 6 pt 7 lt 1 lc rgb '#E6AB02' # dark banana
+set style line 7 pt 7 lt 1 lc rgb '#A6761D' # dark tan
+set style line 8 pt 7 lt 1 lc rgb '#666666' # dark gray
+
+# palette
+set palette maxcolors 8
+set palette defined ( 0 '#1B9E77',\
+    	    	      1 '#D95F02',\
+		      2 '#7570B3',\
+		      3 '#E7298A',\
+		      4 '#66A61E',\
+		      5 '#E6AB02',\
+		      6 '#A6761D',\
+		      7 '#666666' )
+"""
+
 INIT_PLOTS_PDF = """
 set terminal pdfcairo size 32cm,18cm
+set size 1, 0.95
 set output '{filename}'
 """
 
 INIT_PLOTS_LATEX = """
 set terminal epslatex color
+set pointsize 1.0
+set format y "$%.0s%cs$"
 """
 
 INIT_PLOTS_COMMON = """
-set key outside
-set size 1, 0.95
-set xlabel "Number of parameters"
-set ylabel "Response time"
+set grid
+set xlabel "kutsuparametrien määrä"
+set ylabel "vasteaika"
 """
 
 INIT_PLOT_LABEL_PDF = """
@@ -51,16 +83,18 @@ unset xtics
 unset ytics
 """
 
-TEMPLATES['simple_groups'] = """
+SET_TITLE_AND_PAGE_LABEL = """
 set title '{title}'
 set label 2 "page {page}" at screen 0.9, screen 0.95
+"""
+
+TEMPLATES['simple_groups'] = """
 set xlabel "{xlabel}"
-plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with linespoints
+set key inside top left Left box title "{grouptitle}"
+plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with points ls I
 """
 
 TEMPLATES['fitted_lines'] = """
-set title '{title}'
-set label 2 "page {page}" at screen 0.9, screen 0.95
 set xlabel "{xlabel}"
 plot for [I=2:{last_real_column}] '{filename}' index {index} using 1:I title columnhead with points, \
 for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I title columnhead with lines
@@ -68,16 +102,13 @@ for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I
 
 TEMPLATES['named_columns'] = """
 set yrange [-500:*]
-set title '{title}'
-set label 2 "page {page}" at screen 0.9, screen 0.95
 set xlabel "{xlabel}"
 plot for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title columnhead with linespoints
 """
 
 TEMPLATES['histogram'] = """
-set title '{title}'
-set label 2 "page {page}" at screen 0.9, screen 0.95
 set xlabel "{xlabel}"
+unset x2tics
 set xtics rotate
 #set boxwidth 20
 #set style fill solid border lc rgbcolor "black"
@@ -99,11 +130,16 @@ def init(plotscript, filename, mid, output_type='pdf'):
     elif output_type == 'latex':
         plotscript.write(INIT_PLOTS_LATEX)
     plotscript.write(INIT_PLOTS_COMMON)
+    plotscript.write(INIT_PALETTE)
+
+GROUPTITLES={
+    'direction': 'kutsusuunta',
+    'from': 'kieli'
+}
 
 def output_plot(data_headers, data_rows, plotpath,
                 plotscript, title, specs, style, page,
                 xlabel, additional_data=None, output='pdf'):
-    print(output)
     global plot_directory
     template = TEMPLATES[style]
 
@@ -128,6 +164,9 @@ def output_plot(data_headers, data_rows, plotpath,
     if miny == None:
         miny = '*'
 
+    if output == 'pdf':
+        plotscript.write(SET_TITLE_AND_PAGE_LABEL.format(page=page,title=title))
+
     if style == 'binned':
         plotscript.write(template.format(
            title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
@@ -142,9 +181,10 @@ def output_plot(data_headers, data_rows, plotpath,
            xlabel = xlabel, miny=miny, last_real_column=last_real_column, first_fitted_column=first_fitted_column))
 
     else:
+        grouptitle = GROUPTITLES.get(specs['group'], 'group')
         plotscript.write(template.format(
-           title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
-           xlabel = xlabel, miny=miny))
+            title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
+            xlabel = xlabel, miny=miny, grouptitle=grouptitle))
 
 
     
@@ -160,8 +200,11 @@ def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, 
     result += '\n'
 
     for row in data_rows:
-        result += ' '.join([format_value(v, convert_to_seconds=convert_to_seconds) for v in row])
-        result += '\n'
+        results = []
+        for i, v in enumerate(row):
+            convert = convert_to_seconds and i > 0
+            results.append(format_value(v, convert_to_seconds=convert))
+        result += ' '.join(results) + '\n'
     result += '\n\n'
 
     return result

@@ -41,28 +41,35 @@ reference_types = [
 types = reference_types + primitive_types
 
 plot_axes = {
-    'description': 'Operation count',
-    'parameter_count': 'Number of parameters',
-    'dynamic_size': 'Size of object',
-    'direction': 'Call direction',
-    'id': 'Name of benchmark'
+    'description': 'operaatioiden määrä',
+    'parameter_count': 'kutsuparametrien määrä',
+    'dynamic_size': 'kohteen koko',
+    'direction': 'kutsusuunta',
+    'id': 'nimi'
 }
 pp = pprint.PrettyPrinter(depth=10, indent=4)
 
 debugdata = open('/tmp/debug.txt', 'w')
 
-directions = [
-    "%s > %s" % (fr, to) for fr, to in
-    [('C', 'J'), ('J', 'C'), ('J', 'J'), ('C', 'C')]]
+def direction(fr, to, latex):
+    if latex:
+        SEPARATOR = '$\\\\rightarrow$'
+    else:
+        SEPARATOR = ' > '
+    return "%s%s%s" % (fr, SEPARATOR, to)
+
+def directions(latex):
+    return [direction(fr,to,latex) for fr, to in
+     [('C', 'J'), ('J', 'C'), ('J', 'J'), ('C', 'C')]]
 
 
-def preprocess_benchmarks(benchmarks, global_values):
+def preprocess_benchmarks(benchmarks, global_values, latex=False):
     for b in benchmarks:
-        add_derived_values(b)
+        add_derived_values(b, latex=latex)
         add_global_values(b, global_values)
 
 
-def add_derived_values(benchmark):
+def add_derived_values(benchmark, latex=False):
     # migration - todo - remove
     if benchmark.get('response_time_millis') != None:
         benchmark['response_time'] = benchmark.get('response_time_millis')
@@ -82,8 +89,7 @@ def add_derived_values(benchmark):
             if benchmark.get('parameter_type_{t}_count'.format(t=tp)) != None:
                 single_type = tp
                 break
-    benchmark['direction'] = '{f} > {t}'.format(f=benchmark['from'],
-                                                t=benchmark['to'])
+    benchmark['direction'] = direction(benchmark['from'], benchmark['to'], latex)
     benchmark['single_type'] = single_type
 
 
@@ -501,7 +507,7 @@ def plot_benchmarks(
             measure='response_time',
             revision=revision, checksum=checksum, output=output_type)
 
-    for direction in directions:
+    for direction in directions(latex):
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
             title='Dynamic size: parameters, direction ' + direction,
@@ -518,7 +524,7 @@ def plot_benchmarks(
             measure='response_time',
             revision=revision, checksum=checksum, output=output_type)
 
-    for direction in directions:
+    for direction in directions(latex):
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
             title='Dynamic size: return types, direction ' + direction,
@@ -537,7 +543,7 @@ def plot_benchmarks(
     keys_to_remove.append('has_reference_types')
     keys_to_remove.append('dynamic_variation')
 
-    for direction in directions:
+    for direction in directions(latex):
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
@@ -565,7 +571,7 @@ def plot_benchmarks(
         revision=revision, checksum=checksum, output=output_type)
     # had: sort 'response_time', min_series_width: 2 , unused?
 
-    for direction in directions:
+    for direction in directions(latex):
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
@@ -745,6 +751,8 @@ if __name__ == '__main__':
     if 'plotlatex' in method:
         latex = True
         method = 'curves'
+    else:
+        latex = False
 
     output_command = False
     if len(argv) > 5:
@@ -895,9 +903,8 @@ if __name__ == '__main__':
             for f in files:
                 f.close()
 
-        benchmark_group_id = str(uuid.uuid4())
+        benchmark_group_id = os.getenv('PLOT_ID', str(uuid.uuid4()))
         plot_prefix = 'plot-{0}'.format(benchmark_group_id)
-
 
         if latex:
             output_filename = os.path.join(output_path, plot_prefix)
@@ -914,7 +921,7 @@ if __name__ == '__main__':
         metadata_file.write("id: {0}\n".format(benchmark_group_id))
         metadata_file.write("measurements: {0}\n".format(measurement_ids))
 
-        preprocess_benchmarks(benchmarks, global_values)
+        preprocess_benchmarks(benchmarks, global_values, latex=latex)
 
         animate = False
         if pdfviewer == 'anim':
@@ -957,4 +964,5 @@ if __name__ == '__main__':
         print str(output_filename)
     else:
         print str(plot_filename)
+    print(benchmark_group_id)
     exit(0)
