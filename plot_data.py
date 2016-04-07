@@ -313,6 +313,17 @@ def plot(
 
 plot.page = 0
 
+def convert_to_seconds(value):
+    if type(value) == int:
+        strval = str(value)
+        if convert_to_seconds == False:
+            return strval
+        strval = strval.zfill(10)
+        strlen = len(strval)
+        return float("{}.{}".format(
+            strval[0:strlen-9],
+            strval[strlen-9:]))
+    return value
 
 def make_table(series, group, variable, measure, axes_label):
     all_benchmark_variables_set = set()
@@ -335,6 +346,8 @@ def make_table(series, group, variable, measure, axes_label):
             val = grp.get(v, {}).get(measure, None)
             if val is None:
                 val = grp.get(v, {}).get('info', {}).get(measure, None)
+            if measure == 'response_time':
+                val = convert_to_seconds(val)
             row.append(val)
         rows.append(row)
 

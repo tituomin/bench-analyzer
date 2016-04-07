@@ -153,7 +153,7 @@ def output_plot(data_headers, data_rows, plotpath,
         # external data
         filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
         plotdata = open(filename, 'w')
-        specs['convert_to_seconds'] = (output == 'latex')
+        specs['convert_to_seconds'] = False # (output == 'latex')
         plotdata.write(print_benchmarks(data_headers, data_rows, title, **specs))
 
     miny = 0
