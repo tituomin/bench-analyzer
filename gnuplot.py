@@ -90,14 +90,14 @@ set label 2 "page {page}" at screen 0.9, screen 0.95
 
 TEMPLATES['simple_groups'] = """
 set xlabel "{xlabel}"
-set key inside top left box title "\\\\footnotesize {grouptitle}"
-plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with points ls I
+set key inside top left box notitle width -3 ls 2
+plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with points ls I-1
 """
 
 TEMPLATES['fitted_lines'] = """
 set xlabel "{xlabel}"
-plot for [I=2:{last_real_column}] '{filename}' index {index} using 1:I title columnhead with points, \
-for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I title columnhead with lines
+plot for [I=2:{last_real_column}] '{filename}' index {index} using 1:I notitle with points ls I-1, \
+for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I title columnhead with lines ls I-1
 """
 
 TEMPLATES['named_columns'] = """
@@ -126,12 +126,13 @@ set label 1 'C$\\rightarrow$Java' at graph 0.145, 0.78 left rotate by 90
 set label 2 'Java$\\rightarrow$Java' at graph 0.205, 0.78 left rotate by 90
 # set label 2 'Nowhere' at graph 0.09, 0.85 left rotate by 90
 # set label 3 'Everywhere' at graph 0.2, 0.85 left rotate by 90
-set boxwidth 1 relative
-#set style fill solid border lc rgbcolor "black"
+#set boxwidth 0.9 relative
+# set style fill solid border lc rgbcolor "black"
 set style data histograms
-set style histogram clustered gap 4
-set style fill solid 1.0 border lt -1
-plot [] [0:*] for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title " " with histogram
+set style histogram clustered
+#set style fill solid 1.0 border lt -1
+
+plot [] [0:*] for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) every ::1 title " " with histogram fillstyle solid 1.0 border lt -1
 """
 
 measurement_id = None
@@ -158,7 +159,7 @@ def output_plot(data_headers, data_rows, plotpath,
     template = TEMPLATES[style]
 
     if output == 'latex':
-        plotscript.write(INIT_PLOTS_LATEX.format(caption=title,label='duplicate-label'))
+        plotscript.write(INIT_PLOTS_LATEX.format(caption=title + ' (p{})'.format(page),label='duplicate-label'))
         plotscript.write("set output '{}'".format(
             os.path.join(plot_directory,
                          "plot-{}-page-{:02d}.tex".format(measurement_id,
