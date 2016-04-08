@@ -181,11 +181,12 @@ def output_plot(data_headers, data_rows, plotpath,
         if specs['variable'] == 'dynamic_size':
             plotscript.write("set xrange [0:512]\n")
             plotscript.write("set xtics 0, 64\n")
-            plotscript.write("set format x \"\"\n")
+            plotscript.write("set format x \"%6.st\"\n")
         else:
             plotscript.write("unset xtics\n")
             plotscript.write("set xtics autofreq\n")
             plotscript.write("set xrange [*:*]\n")
+            plotscript.write("set format x \"%6.s\"\n")
         rowlen = len(data_rows[0]) - 1
         if style == 'fitted_lines':
             rowlen /= 2
