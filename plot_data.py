@@ -38,6 +38,11 @@ reference_types = [
     for t in array_types.itervalues()
 ]
 
+reference_types.extend([
+    t['java']
+    for t in object_type_definitions
+])
+
 types = reference_types + primitive_types
 
 plot_axes = {
@@ -52,6 +57,10 @@ pp = pprint.PrettyPrinter(depth=10, indent=4)
 debugdata = open('/tmp/debug.txt', 'w')
 
 def direction(fr, to, latex):
+    if fr == 'J':
+        fr = 'Java'
+    if to == 'J':
+        to = 'Java'
     if latex:
         SEPARATOR = '$\\\\rightarrow$'
     else:
@@ -481,7 +490,7 @@ def plot_benchmarks(
             overhead_data = plot(
                 custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
                 style='simple_groups',
-                title='Measuring overhead',
+                title='Mittauksen perusrasite',
                 keys_to_remove=[],
                 select_predicate=(
                         lambda x: x['from'] == from_lang and loop_type in x['id']),
@@ -509,7 +518,7 @@ def plot_benchmarks(
     for i, ptype in enumerate(types):
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
-            title=ptype,
+            title='{}-tyyppiset kutsuparametrit'.format(ptype),
             style='simple_groups',
             keys_to_remove=keys_to_remove + ['dynamic_size'],
             select_predicate=lambda x: (
@@ -523,7 +532,7 @@ def plot_benchmarks(
     for direction in directions(latex):
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
-            title='Dynamic size: parameters, direction ' + direction,
+            title='Vaihteleva argumentin koko kutsusuunnassa ' + direction,
             style='simple_groups',
             keys_to_remove=type_counts,
             select_predicate=(
@@ -540,7 +549,7 @@ def plot_benchmarks(
     for direction in directions(latex):
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
-            title='Dynamic size: return types, direction ' + direction,
+            title='Vaihteleva paluuarvon koko kutsusuunnassa ' + direction,
             style='simple_groups',
             keys_to_remove=type_counts,
             select_predicate=(
@@ -560,7 +569,7 @@ def plot_benchmarks(
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
-            title='Type grouping ' + direction,
+            title='Parametrityyppien vertailu ' + direction,
             keys_to_remove=keys_to_remove,
             select_predicate=(
                 lambda x: x['direction'] == direction),
@@ -572,7 +581,7 @@ def plot_benchmarks(
     plot(
         benchmarks, gnuplotcommands, plotpath, metadata_file,
         style='named_columns',
-        title='Return types',
+        title='Paluuarvon tyypit',
         keys_to_remove=['has_reference_types', 'dynamic_variation'],
         select_predicate=(
             lambda x: x['dynamic_size'] == 0 and
@@ -588,7 +597,7 @@ def plot_benchmarks(
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
-            title='Custom, dynamic ' + direction,
+            title='Erikoiskutsut suunnassa ' + direction,
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
@@ -602,7 +611,7 @@ def plot_benchmarks(
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
-            title='Custom, dynamic ' + direction,
+            title='Erikoiskutsut suunnassa ' + direction,
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
@@ -616,7 +625,7 @@ def plot_benchmarks(
     plot(
         custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
         style='histogram',
-        title='Custom, non-dynamic',
+        title='Erikoiskutsujen vertailu eri kutsusuunnissa',
         select_predicate=(
             lambda x: (
                 x['dynamic_variation'] == 0 and
