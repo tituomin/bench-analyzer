@@ -90,7 +90,7 @@ set label 2 "page {page}" at screen 0.9, screen 0.95
 
 TEMPLATES['simple_groups'] = """
 set xlabel "{xlabel}"
-set key inside top left box notitle width -3 ls 2
+set key inside top left box notitle width -3
 plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with points ls I-1
 """
 
