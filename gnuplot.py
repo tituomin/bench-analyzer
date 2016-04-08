@@ -40,9 +40,9 @@ set output '{filename}'
 """
 
 INIT_PLOTS_LATEX = """
-set terminal epslatex color
+set terminal epslatex input color header "\\\\label{{{label}}}\\\\caption{{{caption}}}"
 set pointsize 1.0
-set format y "$%.0s%cs$"
+set format y "%.00s%cs"
 """
 
 INIT_PLOTS_COMMON = """
@@ -90,7 +90,7 @@ set label 2 "page {page}" at screen 0.9, screen 0.95
 
 TEMPLATES['simple_groups'] = """
 set xlabel "{xlabel}"
-set key inside top left Left box title "{grouptitle}"
+set key inside top left box title "\\\\footnotesize {grouptitle}"
 plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with points ls I
 """
 
@@ -101,21 +101,37 @@ for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I
 """
 
 TEMPLATES['named_columns'] = """
-set yrange [-500:*]
+set yrange [0:*]
 set xlabel "{xlabel}"
 plot for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title columnhead with linespoints
 """
 
 TEMPLATES['histogram'] = """
-set xlabel "{xlabel}"
+set terminal epslatex input color header ""
+unset xlabel
+#set xlabel "{xlabel}" rotate
+unset ylabel
+set y2label "vasteaika"
+set size 2, 2
 unset x2tics
-set xtics rotate
-#set boxwidth 20
+unset xtics
+unset grid
+unset ytics
+
+set y2tics format "%.00s%cs" rotate
+
+set xtics out rotate
+set key at graph 0.1, 0.9 width 2 height 8 notitle horizontal nobox samplen 0.2
+set label 1 'C$\\rightarrow$Java' at graph 0.145, 0.78 left rotate by 90
+set label 2 'Java$\\rightarrow$Java' at graph 0.205, 0.78 left rotate by 90
+# set label 2 'Nowhere' at graph 0.09, 0.85 left rotate by 90
+# set label 3 'Everywhere' at graph 0.2, 0.85 left rotate by 90
+set boxwidth 1 relative
 #set style fill solid border lc rgbcolor "black"
 set style data histograms
-set style histogram clustered
+set style histogram clustered gap 4
 set style fill solid 1.0 border lt -1
-plot [] [{miny}:*] for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title columnhead with histogram
+plot [] [0:*] for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title " " with histogram
 """
 
 measurement_id = None
@@ -127,8 +143,6 @@ def init(plotscript, filename, mid, output_type='pdf'):
     if output_type == 'pdf':
         plotscript.write(INIT_PLOTS_PDF.format(filename=filename))
         plotscript.write(INIT_PLOT_LABEL_PDF.format(bid=measurement_id))
-    elif output_type == 'latex':
-        plotscript.write(INIT_PLOTS_LATEX)
     plotscript.write(INIT_PLOTS_COMMON)
     plotscript.write(INIT_PALETTE)
 
@@ -144,6 +158,7 @@ def output_plot(data_headers, data_rows, plotpath,
     template = TEMPLATES[style]
 
     if output == 'latex':
+        plotscript.write(INIT_PLOTS_LATEX.format(caption=title,label='duplicate-label'))
         plotscript.write("set output '{}'".format(
             os.path.join(plot_directory,
                          "plot-{}-page-{:02d}.tex".format(measurement_id,
@@ -196,7 +211,7 @@ def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, 
         result = '#measure:{m} variable:{v} group:{g}'.format(
             m=measure, v=variable, g=group)
 
-    result = " ".join([format_value(k) for k in data_headers])
+    result = " ".join([format_value("\\\\tiny {}".format(k)) for k in data_headers])
     result += '\n'
 
     for row in data_rows:
