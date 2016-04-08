@@ -113,8 +113,8 @@ plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhe
 
 TEMPLATES['fitted_lines'] = """
 set xlabel "{xlabel}"
-plot for [I=2:{last_real_column}] '{filename}' index {index} using 1:I notitle with points ls I-1, \
-for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I title columnhead with lines ls I-{first_fitted_column}+1
+plot for [I=2:{last_real_column}] '{filename}' index {index} using 1:I title columnhead with points ls I-1, \
+for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I notitle with lines ls I-{first_fitted_column}+1
 """
 
 TEMPLATES['named_columns'] = """
