@@ -15,11 +15,25 @@ INIT_PALETTE = """
 set style line 1 pt 7 lt 1 lc rgb '#1B9E77' # dark teal
 set style line 2 pt 7 lt 1 lc rgb '#D95F02' # dark orange
 set style line 3 pt 7 lt 1 lc rgb '#7570B3' # dark lilac
-set style line 4 pt 7 lt 1 lc rgb '#E7298A' # dark magenta
-set style line 5 pt 7 lt 1 lc rgb '#66A61E' # dark lime green
-set style line 6 pt 7 lt 1 lc rgb '#E6AB02' # dark banana
-set style line 7 pt 7 lt 1 lc rgb '#A6761D' # dark tan
-set style line 8 pt 7 lt 1 lc rgb '#666666' # dark gray
+set style line 4 pt 7 lt 1 lc rgb '#000000' # black
+set style line 5 pt 7 lt 1 lc rgb '#E7298A' # dark magenta
+set style line 6 pt 7 lt 1 lc rgb '#66A61E' # dark lime green
+set style line 7 pt 7 lt 1 lc rgb '#E6AB02' # dark banana
+set style line 8 pt 7 lt 1 lc rgb '#A6761D' # dark tan
+set style line 9 pt 7 lt 1 lc rgb '#666666' # dark gray
+set style line 10 pt 7 lt 1 lc rgb '#1b70b3' # dark blue
+
+set style line 11 pt 5 lt 2 lc rgb '#1B9E77' # dark teal
+set style line 12 pt 5 lt 2 lc rgb '#D95F02' # dark orange
+set style line 13 pt 5 lt 2 lc rgb '#7570B3' # dark lilac
+set style line 14 pt 5 lt 2 lc rgb '#000000' # black
+set style line 15 pt 5 lt 2 lc rgb '#E7298A' # dark magenta
+set style line 16 pt 5 lt 2 lc rgb '#66A61E' # dark lime green
+set style line 17 pt 5 lt 2 lc rgb '#E6AB02' # dark banana
+set style line 18 pt 5 lt 2 lc rgb '#A6761D' # dark tan
+set style line 19 pt 5 lt 2 lc rgb '#666666' # dark gray
+set style line 20 pt 5 lt 2 lc rgb '#1b70b3' # dark blue
+
 
 # palette
 set palette maxcolors 8
@@ -42,7 +56,10 @@ set output '{filename}'
 INIT_PLOTS_LATEX = """
 set terminal epslatex input color header "\\\\label{{{label}}}\\\\caption{{{caption}}}"
 set pointsize 1.0
-set format y "%.00s%cs"
+set format y "%4.2s%cs"
+set output '/home/tituomin/gradu/paper/figures/plots/test.tex'
+test
+set output
 """
 
 INIT_PLOTS_COMMON = """
@@ -90,14 +107,14 @@ set label 2 "page {page}" at screen 0.9, screen 0.95
 
 TEMPLATES['simple_groups'] = """
 set xlabel "{xlabel}"
-set key inside top left box notitle width -3
+set key inside top left box notitle width -3 height +1
 plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with points ls I-1
 """
 
 TEMPLATES['fitted_lines'] = """
 set xlabel "{xlabel}"
 plot for [I=2:{last_real_column}] '{filename}' index {index} using 1:I notitle with points ls I-1, \
-for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I title columnhead with lines ls I-1
+for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I title columnhead with lines ls I-{first_fitted_column}+1
 """
 
 TEMPLATES['named_columns'] = """
@@ -160,6 +177,24 @@ def output_plot(data_headers, data_rows, plotpath,
 
     if output == 'latex':
         plotscript.write(INIT_PLOTS_LATEX.format(caption=title + ' (p{})'.format(page),label='duplicate-label'))
+        # if page > 48: # Hardcoding ...
+        if specs['variable'] == 'dynamic_size':
+            plotscript.write("set xrange [0:512]\n")
+            plotscript.write("set xtics 0, 64\n")
+            plotscript.write("set format x \"\"\n")
+        else:
+            plotscript.write("unset xtics\n")
+            plotscript.write("set xtics autofreq\n")
+            plotscript.write("set xrange [*:*]\n")
+        rowlen = len(data_rows[0]) - 1
+        if style == 'fitted_lines':
+            rowlen /= 2
+        if (page > 51 and rowlen > 7) or rowlen > 10:
+            plotscript.write("set key outside bottom center\n");
+            plotscript.write("set size 1, 2\n");
+        if rowlen < 15:
+            plotscript.write("set size 1, 1\n");
+
         plotscript.write("set output '{}'".format(
             os.path.join(plot_directory,
                          "plot-{}-page-{:02d}.tex".format(measurement_id,

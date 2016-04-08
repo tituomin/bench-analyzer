@@ -497,7 +497,9 @@ def plot_benchmarks(
                 group='from',
                 measure='response_time',
                 variable='description',
-                revision=revision, checksum=checksum, output=output_type)
+                revision=revision,
+                checksum=checksum,
+                output=output_type)
 
             if overhead_data == None:
                 continue
@@ -597,7 +599,7 @@ def plot_benchmarks(
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
-            title='Erikoiskutsut suunnassa ' + direction,
+            title='Erityiskutsut suunnassa ' + direction,
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
@@ -611,7 +613,7 @@ def plot_benchmarks(
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
-            title='Erikoiskutsut suunnassa ' + direction,
+            title='Erityiskutsut suunnassa ' + direction,
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
@@ -625,7 +627,7 @@ def plot_benchmarks(
     plot(
         custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
         style='histogram',
-        title='Erikoiskutsujen vertailu eri kutsusuunnissa',
+        title='Erityiskutsujen vertailu eri kutsusuunnissa',
         select_predicate=(
             lambda x: (
                 x['dynamic_variation'] == 0 and
