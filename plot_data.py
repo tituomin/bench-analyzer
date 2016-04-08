@@ -522,7 +522,7 @@ def plot_benchmarks(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
             title='{}-tyyppiset kutsuparametrit'.format(ptype),
             style='simple_groups',
-            keys_to_remove=keys_to_remove + ['dynamic_size'],
+            keys_to_remove=keys_to_remove + ['dynamic_size'] + ['has_reference_types'],
             select_predicate=lambda x: (
                 x['single_type'] in [ptype, 'any'] and
                 x['dynamic_size'] == 0),
