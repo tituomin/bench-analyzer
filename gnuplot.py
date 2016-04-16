@@ -131,12 +131,12 @@ unset ylabel
 set y2label "vasteaika"
 set size 2, 2
 unset x2tics
-unset xtics
+#unset xtics
 unset ytics
 
 set y2tics format "%.00s%cs" rotate
 
-#set xtics out rotate
+set xtics out rotate
 set key at graph 0.1, 0.9 width 2 height 8 notitle horizontal nobox samplen 0.2
 set label 1 'C$\\rightarrow$Java' at graph 0.145, 0.78 left rotate by 90
 set label 2 'Java$\\rightarrow$Java' at graph 0.205, 0.78 left rotate by 90
