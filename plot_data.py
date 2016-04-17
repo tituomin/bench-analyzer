@@ -73,10 +73,11 @@ def directions(latex):
 
 
 def preprocess_benchmarks(benchmarks, global_values, latex=False):
+    benchmarks = [b for b in benchmarks if b['repetitions'] is not None]
     for b in benchmarks:
         add_derived_values(b, latex=latex)
         add_global_values(b, global_values)
-
+    return benchmarks
 
 def add_derived_values(benchmark, latex=False):
     # migration - todo - remove
@@ -945,7 +946,7 @@ if __name__ == '__main__':
         metadata_file.write("id: {0}\n".format(benchmark_group_id))
         metadata_file.write("measurements: {0}\n".format(measurement_ids))
 
-        preprocess_benchmarks(benchmarks, global_values, latex=latex)
+        benchmarks = preprocess_benchmarks(benchmarks, global_values, latex=latex)
 
         animate = False
         if pdfviewer == 'anim':
