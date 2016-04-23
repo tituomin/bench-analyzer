@@ -57,8 +57,6 @@ INIT_PLOTS_LATEX = """
 set terminal epslatex input color header "\\\\label{{{label}}}\\\\caption{{{caption}}}"
 set pointsize 1.0
 set format y "%4.2s%cs"
-set output '/home/tituomin/gradu/paper/figures/plots/test.tex'
-test
 set output
 """
 
