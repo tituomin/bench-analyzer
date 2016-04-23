@@ -657,9 +657,12 @@ def sync_measurements(dev_path, host_path, filename, update=True):
         kwargs['stdout'] = FNULL
         kwargs['stderr'] = FNULL
 
-    success = call(['adb', 'pull',
-                    dev_path + '/' + filename,
-                    tmp_path], **kwargs)
+    try:
+        success = call(['adb', 'pull',
+                        dev_path + '/' + filename,
+                        tmp_path], **kwargs)
+    except OSError:
+        success = -1
     if success == 0:
         if os.path.exists(old_path):
             size_new = os.path.getsize(tmp_path)
