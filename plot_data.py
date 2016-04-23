@@ -73,7 +73,11 @@ def directions(latex):
 
 
 def preprocess_benchmarks(benchmarks, global_values, latex=False):
-    benchmarks = [b for b in benchmarks if b['repetitions'] is not None]
+    # For allocating benchmarks, the repetition count for individual benchmarks
+    # come from the datafile. For non-allocating, it is a global value.
+    keys = set([key for b in benchmarks for key in b.keys()])
+    if 'repetitions' in keys:
+        benchmarks = [b for b in benchmarks if b['repetitions'] is not None]
     for b in benchmarks:
         add_derived_values(b, latex=latex)
         add_global_values(b, global_values)
