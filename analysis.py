@@ -23,7 +23,6 @@ def linear_fit(rows):
 
 def estimate_measuring_overhead(rows):
     x, polys, residuals = linear_fit(rows)
-    print polys
     return [p[1] for p in polys]
 
 def optimize_bins(x):

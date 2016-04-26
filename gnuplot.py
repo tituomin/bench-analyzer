@@ -173,7 +173,7 @@ def output_plot(data_headers, data_rows, plotpath,
     template = TEMPLATES[style]
 
     if output == 'latex':
-        plotscript.write(INIT_PLOTS_LATEX.format(caption=title + ' (p{})'.format(page),label='duplicate-label'))
+        plotscript.write(INIT_PLOTS_LATEX.format(caption=title + ' (p{})'.format(page),label='duplicate-label-%s' % page))
         # if page > 48: # Hardcoding ...
         if specs['variable'] == 'dynamic_size':
             plotscript.write("set xrange [0:512]\n")
@@ -236,11 +236,8 @@ def output_plot(data_headers, data_rows, plotpath,
             xlabel = xlabel, miny=miny, grouptitle=grouptitle))
 
 
-    
-
 def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None, convert_to_seconds=False):
     result = '#{0}\n'.format(title)
-    print(measure)
     if group and variable and measure:
         result = '#measure:{m} variable:{v} group:{g}'.format(
             m=measure, v=variable, g=group)

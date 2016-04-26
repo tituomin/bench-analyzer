@@ -105,7 +105,10 @@ def add_derived_values(benchmark, latex=False):
                 break
     benchmark['direction'] = direction(benchmark['from'], benchmark['to'], latex)
     benchmark['single_type'] = single_type
-
+    if 'Nio' in benchmark['id']:
+        benchmark['nio'] = True
+    else:
+        benchmark['nio'] = False
 
 def add_global_values(benchmark, global_values):
     for key, val in global_values.iteritems():
@@ -322,6 +325,10 @@ def plot(
                 title, specs, 'fitted_lines', plot.page, axes_label, output=output)
 
             metadata_file.write(
+                "\nslope:\n" + textualtable.make_textual_table(headers[1:], [map(lambda p: p[0], polys)]))
+            metadata_file.write(
+                "\nintercept:\n" + textualtable.make_textual_table(headers[1:], [map(lambda p: p[1], polys)]))
+            metadata_file.write(
                 "\nresiduals:\n" + textualtable.make_textual_table(headers[1:], [residuals]))
     return data
 
@@ -477,23 +484,24 @@ def plot_benchmarks(
 
     #all_benchmarks = [x for x in all_benchmarks if x['repetitions'] == None and x['multiplier'] == None]
 
-    custom_benchmarks = [bm for bm in all_benchmarks if bm['no'] == -1]
-    benchmarks = [bm for bm in all_benchmarks if bm['no'] != -1]
-
     type_counts = ["parameter_type_{t}_count".format(t=tp) for tp in types]
     keys_to_remove = type_counts[:]
     keys_to_remove.extend(
         ['parameter_type_count', 'single_type', 'dynamic_variation'])
 
+    benchmarks = [bm for bm in all_benchmarks if bm['no'] != -1]
     defaults = [benchmarks, gnuplotcommands, plotpath]
 
 #    analysis.calculate_overheads()
     overhead_estimates = {}
+    overhead_benchmarks = [
+        bm for bm in all_benchmarks
+        if bm['no'] == -1 and 'Overhead' in bm ['id']]
     for loop_type in ['AllocOverhead', 'NormalOverhead']:
         for from_lang in ['C', 'J']:
             overhead_estimates[from_lang] = {}
             overhead_data = plot(
-                custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
+                overhead_benchmarks, gnuplotcommands, plotpath, metadata_file,
                 style='simple_groups',
                 title='Mittauksen perusrasite',
                 keys_to_remove=[],
@@ -600,6 +608,26 @@ def plot_benchmarks(
         revision=revision, checksum=checksum, output=output_type)
     # had: sort 'response_time', min_series_width: 2 , unused?
 
+    def is_utf(b):
+        return 'UTF' in b['id'] or 'CopyUnicode' in b['id']
+    def is_arrayregion(x):
+        return 'ArrayRegion' in x['id']
+    def is_bytebufferview(x):
+        return 'ByteBufferView' in x['id']
+
+    custom_benchmarks = [
+        bm for bm in all_benchmarks
+        if bm['no'] == -1 and 'Overhead' not in bm['id'] and not is_utf(bm) and not is_bytebufferview(bm)]
+
+    utf_benchmarks = [
+        bm for bm in all_benchmarks
+        if bm['no'] == -1 and is_utf(bm)]
+
+    bytebufferview_benchmarks = [
+        bm for bm in all_benchmarks
+        if bm['no'] == -1 and is_bytebufferview(bm)
+    ]
+
     for direction in directions(latex):
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
@@ -608,8 +636,7 @@ def plot_benchmarks(
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
-                           'ArrayRegion' not in x['id'] and
-                           'Overhead' not in x['id'])),
+                           not is_arrayregion(x))),
             group='id',
             measure='response_time',
             variable='dynamic_size',
@@ -622,8 +649,45 @@ def plot_benchmarks(
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
-                           'ArrayRegion' in x['id'] and
-                           'Overhead' not in x['id'])),
+                           is_arrayregion(x))),
+            group='id',
+            measure='response_time',
+            variable='dynamic_size',
+            revision=revision, checksum=checksum, output=output_type)
+
+        plot(
+            utf_benchmarks, gnuplotcommands, plotpath, metadata_file,
+            style='simple_groups',
+            title='Erityiskutsut suunnassa ' + direction,
+            select_predicate=(
+                lambda x: (x['direction'] == direction and
+                           x['dynamic_variation'] == 1)),
+            group='id',
+            measure='response_time',
+            variable='dynamic_size',
+            revision=revision, checksum=checksum, output=output_type)
+
+        plot(
+            bytebufferview_benchmarks, gnuplotcommands, plotpath, metadata_file,
+            style='simple_groups',
+            title='Erityiskutsut suunnassa ' + direction,
+            select_predicate=(
+                lambda x: (x['direction'] == direction and
+                           x['dynamic_variation'] == 1 and
+                           'Bulk' not in x['id'])),
+            group='id',
+            measure='response_time',
+            variable='dynamic_size',
+            revision=revision, checksum=checksum, output=output_type)
+
+        plot(
+            bytebufferview_benchmarks, gnuplotcommands, plotpath, metadata_file,
+            style='simple_groups',
+            title='Erityiskutsut suunnassa ' + direction,
+            select_predicate=(
+                lambda x: (x['direction'] == direction and
+                           x['dynamic_variation'] == 1 and
+                           'Bulk' in x['id'])),
             group='id',
             measure='response_time',
             variable='dynamic_size',
@@ -635,8 +699,7 @@ def plot_benchmarks(
         title='Erityiskutsujen vertailu eri kutsusuunnissa',
         select_predicate=(
             lambda x: (
-                x['dynamic_variation'] == 0 and
-                'Overhead' not in x['id'])),
+                x['dynamic_variation'] == 0)),
         group='direction',
         measure='response_time',
         variable='id',
