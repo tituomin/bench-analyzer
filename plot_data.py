@@ -324,17 +324,16 @@ def plot(
                 headers + headers[1:], fitted_curves, plotpath, gnuplot_script,
                 title, specs, 'fitted_lines', plot.page, axes_label, output=output)
 
-            metadata_file.write(
-                "\nslope:\n" + textualtable.make_textual_table(headers[1:], [map(lambda p: p[0], polys)]))
-            metadata_file.write(
-                "\nintercept:\n" + textualtable.make_textual_table(headers[1:], [map(lambda p: p[1], polys)]))
-
             def simplified_function(poly):
                 return "{:.3g} * x {:+.3g}".format(poly[0], poly[1])
             metadata_file.write(
-                "\npolynomial:\n" + textualtable.make_textual_table(headers[1:], [map(simplified_function, polys)]))
+                "\npolynomial:\n" + textualtable.make_vertical_textual_table(headers[1:], [map(simplified_function, polys)]))
             metadata_file.write(
-                "\nresiduals:\n" + textualtable.make_textual_table(headers[1:], [residuals]))
+                "\nresiduals:\n" + textualtable.make_vertical_textual_table(headers[1:], [residuals]))
+            metadata_file.write(
+                "\nslope:\n" + textualtable.make_vertical_textual_table(headers[1:], [map(lambda p: p[0], polys)]))
+            metadata_file.write(
+                "\nintercept:\n" + textualtable.make_vertical_textual_table(headers[1:], [map(lambda p: p[1], polys)]))
     return data
 
 plot.page = 0

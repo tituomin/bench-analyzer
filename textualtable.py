@@ -20,3 +20,18 @@ def make_textual_table(headers, rows):
     for row in rows:
         result += row_format.format(*row)
     return result
+
+def make_vertical_textual_table(headers, elements):
+    result = ""
+    max_width = max((len(x) for x in headers))
+
+    header_format = "{{:>{w}}}".format(w=max_width)
+
+    for i in range(0, len(headers)):
+        result += header_format.format(headers[i])
+        for group in elements:
+            result += "    "
+            result += str(group[i])
+        result += "\n"
+
+    return result
