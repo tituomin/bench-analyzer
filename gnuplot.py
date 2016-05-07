@@ -100,7 +100,7 @@ unset ytics
 
 SET_TITLE_AND_PAGE_LABEL = """
 set title '{title}'
-set label 2 "page {page}" at screen 0.9, screen 0.95
+set label 2 "{page}" at screen 0.9, screen 0.95
 """
 
 TEMPLATES['simple_groups'] = """
@@ -168,12 +168,13 @@ GROUPTITLES={
 
 def output_plot(data_headers, data_rows, plotpath,
                 plotscript, title, specs, style, page,
+                identifier,
                 xlabel, additional_data=None, output='pdf'):
     global plot_directory
     template = TEMPLATES[style]
 
     if output == 'latex':
-        plotscript.write(INIT_PLOTS_LATEX.format(caption=title + ' (p{})'.format(page),label='duplicate-label-%s' % page))
+        plotscript.write(INIT_PLOTS_LATEX.format(caption=title,label=identifier))
         # if page > 48: # Hardcoding ...
         if specs['variable'] == 'dynamic_size':
             plotscript.write("set xrange [0:512]\n")
@@ -195,8 +196,7 @@ def output_plot(data_headers, data_rows, plotpath,
 
         plotscript.write("set output '{}'".format(
             os.path.join(plot_directory,
-                         "plot-{}-page-{:02d}.tex".format(measurement_id,
-                                                          page))))
+                         "plot-{}-{}.tex".format(measurement_id, identifier))))
 
     if plotpath:
         # external data
@@ -214,11 +214,11 @@ def output_plot(data_headers, data_rows, plotpath,
         miny = '*'
 
     if output == 'pdf':
-        plotscript.write(SET_TITLE_AND_PAGE_LABEL.format(page=page,title=title))
+        plotscript.write(SET_TITLE_AND_PAGE_LABEL.format(page=identifier,title=title))
 
     if style == 'binned':
         plotscript.write(template.format(
-           title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
+           title = title, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
            xlabel = xlabel, miny=miny, **additional_data))
 
     elif style == 'fitted_lines':
@@ -226,13 +226,13 @@ def output_plot(data_headers, data_rows, plotpath,
         last_real_column = 1 + length / 2
         first_fitted_column = last_real_column + 1
         plotscript.write(template.format(
-           title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
+           title = title, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
            xlabel = xlabel, miny=miny, last_real_column=last_real_column, first_fitted_column=first_fitted_column))
 
     else:
         grouptitle = GROUPTITLES.get(specs['group'], 'group')
         plotscript.write(template.format(
-            title = title, page = page, filename = filename, index = 0, last_column = len(data_rows[0]),
+            title = title, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
             xlabel = xlabel, miny=miny, grouptitle=grouptitle))
 
 

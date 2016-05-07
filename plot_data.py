@@ -56,7 +56,7 @@ pp = pprint.PrettyPrinter(depth=10, indent=4)
 
 debugdata = open('/tmp/debug.txt', 'w')
 
-def direction(fr, to, latex):
+def format_direction(fr, to, latex):
     if fr == 'J':
         fr = 'Java'
     if to == 'J':
@@ -67,10 +67,7 @@ def direction(fr, to, latex):
         SEPARATOR = ' > '
     return "%s%s%s" % (fr, SEPARATOR, to)
 
-def directions(latex):
-    return [direction(fr,to,latex) for fr, to in
-     [('C', 'J'), ('J', 'C'), ('J', 'J'), ('C', 'C')]]
-
+DIRECTIONS = [('C', 'J'), ('J', 'C'), ('J', 'J'), ('C', 'C')]
 
 def preprocess_benchmarks(benchmarks, global_values, latex=False):
     # For allocating benchmarks, the repetition count for individual benchmarks
@@ -103,7 +100,7 @@ def add_derived_values(benchmark, latex=False):
             if benchmark.get('parameter_type_{t}_count'.format(t=tp)) != None:
                 single_type = tp
                 break
-    benchmark['direction'] = direction(benchmark['from'], benchmark['to'], latex)
+    benchmark['direction'] = format_direction(benchmark['from'], benchmark['to'], latex)
     benchmark['single_type'] = single_type
     if 'Nio' in benchmark['id']:
         benchmark['nio'] = True
@@ -236,6 +233,7 @@ def plot(
         keys_to_remove=None, select_predicate=None,
         group=None, variable=None, measure=None,
         title=None, style=None, min_series_width=1,
+        identifier=None,
         revision=None, checksum=None, output='pdf'):
 
     filtered_benchmarks = [
@@ -262,10 +260,13 @@ def plot(
 
     data = extract_data(filtered_benchmarks, **specs)
 
+    index = -1
+    data_len = len([s for s in data if len(s.keys()) >= min_series_width])
     for series in data:
         if len(series.keys()) < min_series_width:
             # there are not enough groups to display
             continue
+        index += 1
 
         plot.page += 1
         axes_label = plot_axes.get(variable, '<unknown variable>')
@@ -273,9 +274,14 @@ def plot(
         headers, rows = make_table(
             series, group, variable, measure, axes_label)
 
+        assert identifier is not None
+        id_suffix = ""
+        if data_len > 1:
+            id_suffix = "-{}".format(index)
+
         gnuplot.output_plot(
             headers, rows, plotpath, gnuplot_script,
-            title, specs, style, plot.page, axes_label, output=output)
+            title, specs, style, plot.page, identifier + id_suffix, axes_label, output=output)
 
         metadata_file.write("\n\n{0} (Page {1})\n\n".format(title, plot.page))
 
@@ -322,7 +328,7 @@ def plot(
             plot.page += 1
             gnuplot.output_plot(
                 headers + headers[1:], fitted_curves, plotpath, gnuplot_script,
-                title, specs, 'fitted_lines', plot.page, axes_label, output=output)
+                title, specs, 'fitted_lines', plot.page, identifier + id_suffix + '-fit', axes_label, output=output)
 
             def simplified_function(poly):
                 return "{:.3g} * x {:+.3g}".format(poly[0], poly[1])
@@ -508,6 +514,7 @@ def plot_benchmarks(
                 overhead_benchmarks, gnuplotcommands, plotpath, metadata_file,
                 style='simple_groups',
                 title='Mittauksen perusrasite',
+                identifier='overhead-{}'.format(from_lang.lower()),
                 keys_to_remove=[],
                 select_predicate=(
                         lambda x: x['from'] == from_lang and loop_type in x['id']),
@@ -538,6 +545,7 @@ def plot_benchmarks(
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
             title='{}-tyyppiset kutsuparametrit'.format(ptype),
+            identifier='basic-call-{}'.format(ptype),
             style='simple_groups',
             keys_to_remove=keys_to_remove + ['dynamic_size'] + ['has_reference_types'],
             select_predicate=lambda x: (
@@ -548,10 +556,12 @@ def plot_benchmarks(
             measure='response_time',
             revision=revision, checksum=checksum, output=output_type)
 
-    for direction in directions(latex):
+    for fr, to in DIRECTIONS:
+        direction = format_direction(fr, to, latex)
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
             title='Vaihteleva argumentin koko kutsusuunnassa ' + direction,
+            identifier='variable-argument-size-{}-{}'.format(fr.lower(), to.lower()),
             style='simple_groups',
             keys_to_remove=type_counts,
             select_predicate=(
@@ -565,10 +575,12 @@ def plot_benchmarks(
             measure='response_time',
             revision=revision, checksum=checksum, output=output_type)
 
-    for direction in directions(latex):
+    for fr, to in DIRECTIONS:
+        direction = format_direction(fr, to, latex)
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
             title='Vaihteleva paluuarvon koko kutsusuunnassa ' + direction,
+            identifier='variable-return-value-size-{}-{}'.format(fr.lower(), to.lower()),
             style='simple_groups',
             keys_to_remove=type_counts,
             select_predicate=(
@@ -584,11 +596,13 @@ def plot_benchmarks(
     keys_to_remove.append('has_reference_types')
     keys_to_remove.append('dynamic_variation')
 
-    for direction in directions(latex):
+    for fr, to in DIRECTIONS:
+        direction = format_direction(fr, to, latex)
         plot(
             benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
             title='Parametrityyppien vertailu ' + direction,
+            identifier='basic-call-all-types-{}-{}'.format(fr.lower(), to.lower()),
             keys_to_remove=keys_to_remove,
             select_predicate=(
                 lambda x: x['direction'] == direction),
@@ -601,6 +615,7 @@ def plot_benchmarks(
         benchmarks, gnuplotcommands, plotpath, metadata_file,
         style='named_columns',
         title='Paluuarvon tyypit',
+        identifier='return-value-types',
         keys_to_remove=['has_reference_types', 'dynamic_variation'],
         select_predicate=(
             lambda x: x['dynamic_size'] == 0 and
@@ -632,11 +647,13 @@ def plot_benchmarks(
         if bm['no'] == -1 and is_bytebufferview(bm)
     ]
 
-    for direction in directions(latex):
+    for fr, to in DIRECTIONS:
+        direction = format_direction(fr, to, latex)
         plot(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
             title='Erityiskutsut suunnassa ' + direction,
+            identifier='special-calls-{}-{}'.format(fr.lower(), to.lower()),
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
@@ -650,6 +667,7 @@ def plot_benchmarks(
             custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
             title='Erityiskutsut suunnassa ' + direction,
+            identifier='special-calls-arrayregion-{}-{}'.format(fr.lower(), to.lower()),
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
@@ -663,6 +681,7 @@ def plot_benchmarks(
             utf_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
             title='Erityiskutsut suunnassa ' + direction,
+            identifier='special-calls-utf-{}-{}'.format(fr.lower(), to.lower()),
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1)),
@@ -675,6 +694,7 @@ def plot_benchmarks(
             bytebufferview_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
             title='Erityiskutsut suunnassa ' + direction,
+            identifier='special-calls-bytebufferview-{}-{}'.format(fr.lower(), to.lower()),
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
@@ -688,6 +708,7 @@ def plot_benchmarks(
             bytebufferview_benchmarks, gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
             title='Erityiskutsut suunnassa ' + direction,
+            identifier='special-calls-bulk-bytebufferview-{}-{}'.format(fr.lower(), to.lower()),
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1 and
@@ -701,6 +722,7 @@ def plot_benchmarks(
         custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
         style='histogram',
         title='Erityiskutsujen vertailu eri kutsusuunnissa',
+        identifier='special-calls-non-dynamic',
         select_predicate=(
             lambda x: (
                 x['dynamic_variation'] == 0)),
@@ -808,8 +830,9 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
         perf_file = record['zip'].extract('{}/{}'.format(record['mid'], record['filename']), '/tmp')
         try:
             command_parts = [
-                "perf report",
+                "/home/tituomin/install/linux-4.2.0/tools/perf/perf report",
                 "-i {}",
+                "--header",
                 "--symfs=/home/tituomin/droid-symbols",
                 "--kallsyms=/home/tituomin/droid/linux-kernel/kallsyms"
             ]
