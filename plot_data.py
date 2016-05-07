@@ -261,6 +261,7 @@ def plot(
     data = extract_data(filtered_benchmarks, **specs)
 
     index = -1
+
     data_len = len([s for s in data if len(s.keys()) >= min_series_width])
     for series in data:
         if len(series.keys()) < min_series_width:
@@ -283,7 +284,7 @@ def plot(
             headers, rows, plotpath, gnuplot_script,
             title, specs, style, plot.page, identifier + id_suffix, axes_label, output=output)
 
-        metadata_file.write("\n\n{0} (Page {1})\n\n".format(title, plot.page))
+        metadata_file.write("\n\n{0}\n{1}\n\n".format(title, identifier + id_suffix))
 
         keyvalpairs = series.values()[0].values()[0]['fixed'].items() + [
             ('variable', axes_label),
@@ -514,7 +515,7 @@ def plot_benchmarks(
                 overhead_benchmarks, gnuplotcommands, plotpath, metadata_file,
                 style='simple_groups',
                 title='Mittauksen perusrasite',
-                identifier='overhead-{}'.format(from_lang.lower()),
+                identifier='{}-{}'.format(loop_type.lower(), from_lang.lower()),
                 keys_to_remove=[],
                 select_predicate=(
                         lambda x: x['from'] == from_lang and loop_type in x['id']),
