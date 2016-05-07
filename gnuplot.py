@@ -54,7 +54,7 @@ set output '{filename}'
 """
 
 INIT_PLOTS_LATEX = """
-set terminal epslatex input color header "\\\\label{{{label}}}\\\\caption{{{caption}}}"
+set terminal epslatex input color header "\\\\caption{{{caption}}}\\\\label{{fig:{label}}}"
 set pointsize 1.0
 set format y "%4.2s%cs"
 set output
