@@ -831,18 +831,23 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
         perf_file = record['zip'].extract('{}/{}'.format(record['mid'], record['filename']), '/tmp')
         try:
             command_parts = [
-                "/home/tituomin/install/linux-4.2.0/tools/perf/perf report",
+                #"/home/tituomin/droid/src/out/host/linux-x86/bin/perfhost report",
+                #"/home/tituomin/install/linux-4.2.0/tools/perf/perf report",
+                "perf report",
                 "-i {}",
                 "--header",
                 "--symfs=/home/tituomin/droid-symbols",
                 "--kallsyms=/home/tituomin/droid/linux-kernel/kallsyms"
             ]
-            if not output_command:
-                command_parts.extend([
-                    "-g graph,0.9,caller",
-                    "-s parent",
-                    "--stdio >/tmp/out.txt"
-                ])
+            #if not output_command:
+            command_parts.extend([
+                "-g graph,0,caller",
+                "--parent='dvmPlatformInvoke'",
+                "-s parent",
+                "--stdio",
+                "| c++filt",
+                ">/tmp/out.txt"
+            ])
             command = " ".join(command_parts).format(perf_file)
             if output_command:
                 print command
