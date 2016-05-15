@@ -109,6 +109,10 @@ def add_derived_values(benchmark, latex=False):
             bid = 'ReadStringCritical'
         elif bid == 'ReadUTF':
             bid = 'ReadStringUTF'
+        elif bid == 'ReadObjectArrayElement':
+            bid = 'GetObjectArrayElement'
+        elif bid == 'WriteObjectArrayElement':
+            bid = 'SetObjectArrayElement'
         else:
             rename = False
         if rename:
