@@ -661,7 +661,10 @@ def plot_benchmarks(
         'arrayregion': lambda x: 'ArrayRegion' in x['id'],
         'bytebufferview': lambda x: 'ByteBufferView' in x['id'],
         'unicode': lambda b: not utf(b) and 'String' in b['id'],
-        'arrayelements': lambda x: 'ArrayElements' in x['id']
+        'arrayelements': (lambda x:
+                          'ArrayElements' in x['id'] or
+                          'ArrayLength' in x['id'] or
+                          'ReadPrimitive' in x['id']),
     }
     def uncategorized(x):
         for f in filters.values():
@@ -701,6 +704,19 @@ def plot_benchmarks(
             style='simple_groups',
             title='Erityiskutsut suunnassa ' + direction,
             identifier='special-calls-arrayregion-{}-{}'.format(fr.lower(), to.lower()),
+            select_predicate=(
+                lambda x: (x['direction'] == direction and
+                           x['dynamic_variation'] == 1)),
+            group='id',
+            measure='response_time',
+            variable='dynamic_size',
+            revision=revision, checksum=checksum, output=output_type)
+
+        plot(
+            benchmarks['arrayelements'], gnuplotcommands, plotpath, metadata_file,
+            style='simple_groups',
+            title='Erityiskutsut suunnassa ' + direction,
+            identifier='special-calls-arrayelements-{}-{}'.format(fr.lower(), to.lower()),
             select_predicate=(
                 lambda x: (x['direction'] == direction and
                            x['dynamic_variation'] == 1)),
