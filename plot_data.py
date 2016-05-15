@@ -653,25 +653,33 @@ def plot_benchmarks(
         revision=revision, checksum=checksum, output=output_type)
     # had: sort 'response_time', min_series_width: 2 , unused?
 
-    def is_utf(b):
-        return 'UTF' in b['id'] or 'CopyUnicode' in b['id']
-    def is_arrayregion(x):
-        return 'ArrayRegion' in x['id']
-    def is_bytebufferview(x):
-        return 'ByteBufferView' in x['id']
+    def utf(b):
+        return 'UTF' in b['id']
 
-    custom_benchmarks = [
-        bm for bm in all_benchmarks
-        if bm['no'] == -1 and 'Overhead' not in bm['id'] and not is_utf(bm) and not is_bytebufferview(bm)]
+    filters = {
+        'utf': utf,
+        'arrayregion': lambda x: 'ArrayRegion' in x['id'],
+        'bytebufferview': lambda x: 'ByteBufferView' in x['id'],
+        'unicode': lambda b: not utf(b) and 'String' in b['id'],
+        'arrayelements': lambda x: 'ArrayElements' in x['id']
+    }
+    def uncategorized(x):
+        for f in filters.values():
+            if f(x):
+                return False
+        return True
 
-    utf_benchmarks = [
-        bm for bm in all_benchmarks
-        if bm['no'] == -1 and is_utf(bm)]
+    benchmarks = {}
+    for key, f in filters.iteritems():
+        benchmarks[key] = [
+            bm for bm in all_benchmarks
+            if bm['no'] == -1 and f(bm)]
 
-    bytebufferview_benchmarks = [
+    benchmarks['uncategorized'] = [
         bm for bm in all_benchmarks
-        if bm['no'] == -1 and is_bytebufferview(bm)
-    ]
+        if bm['no'] == -1 and 'Overhead' not in bm['id'] and uncategorized(bm)]
+
+    custom_benchmarks = benchmarks['uncategorized']
 
     for fr, to in DIRECTIONS:
         direction = format_direction(fr, to, latex)
@@ -682,31 +690,29 @@ def plot_benchmarks(
             identifier='special-calls-{}-{}'.format(fr.lower(), to.lower()),
             select_predicate=(
                 lambda x: (x['direction'] == direction and
-                           x['dynamic_variation'] == 1 and
-                           not is_arrayregion(x))),
+                           x['dynamic_variation'] == 1)),
             group='id',
             measure='response_time',
             variable='dynamic_size',
             revision=revision, checksum=checksum, output=output_type)
 
         plot(
-            custom_benchmarks, gnuplotcommands, plotpath, metadata_file,
+            benchmarks['arrayregion'], gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
             title='Erityiskutsut suunnassa ' + direction,
             identifier='special-calls-arrayregion-{}-{}'.format(fr.lower(), to.lower()),
             select_predicate=(
                 lambda x: (x['direction'] == direction and
-                           x['dynamic_variation'] == 1 and
-                           is_arrayregion(x))),
+                           x['dynamic_variation'] == 1)),
             group='id',
             measure='response_time',
             variable='dynamic_size',
             revision=revision, checksum=checksum, output=output_type)
 
         plot(
-            utf_benchmarks, gnuplotcommands, plotpath, metadata_file,
+            benchmarks['utf'], gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
-            title='Erityiskutsut suunnassa ' + direction,
+            title='UTF-merkkijonot suunnassa ' + direction,
             identifier='special-calls-utf-{}-{}'.format(fr.lower(), to.lower()),
             select_predicate=(
                 lambda x: (x['direction'] == direction and
@@ -717,7 +723,21 @@ def plot_benchmarks(
             revision=revision, checksum=checksum, output=output_type)
 
         plot(
-            bytebufferview_benchmarks, gnuplotcommands, plotpath, metadata_file,
+            benchmarks['unicode'], gnuplotcommands, plotpath, metadata_file,
+            style='simple_groups',
+            key_placement='inside bottom left',
+            title='Unicode-merkkijonot suunnassa ' + direction,
+            identifier='special-calls-unicode-{}-{}'.format(fr.lower(), to.lower()),
+            select_predicate=(
+                lambda x: (x['direction'] == direction and
+                           x['dynamic_variation'] == 1)),
+            group='id',
+            measure='response_time',
+            variable='dynamic_size',
+            revision=revision, checksum=checksum, output=output_type)
+
+        plot(
+            benchmarks['bytebufferview'], gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
             title='Erityiskutsut suunnassa ' + direction,
             identifier='special-calls-bytebufferview-{}-{}'.format(fr.lower(), to.lower()),
@@ -731,7 +751,7 @@ def plot_benchmarks(
             revision=revision, checksum=checksum, output=output_type)
 
         plot(
-            bytebufferview_benchmarks, gnuplotcommands, plotpath, metadata_file,
+            benchmarks['bytebufferview'], gnuplotcommands, plotpath, metadata_file,
             style='simple_groups',
             title='Erityiskutsut suunnassa ' + direction,
             identifier='special-calls-bulk-bytebufferview-{}-{}'.format(fr.lower(), to.lower()),
