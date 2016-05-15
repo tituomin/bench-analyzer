@@ -91,6 +91,28 @@ def add_derived_values(benchmark, latex=False):
         benchmark['dynamic_size'] = 0
     else:
         benchmark['dynamic_variation'] = 1
+    if benchmark['no'] == -1:
+        # Custom benchmark, do some name mapping:
+        bid = benchmark['id']
+        rename = True
+        if bid == 'CopyUnicode':
+            bid = 'GetStringRegion'
+        elif bid == 'CopyUTF':
+            bid = 'GetStringRegionUTF'
+        elif bid == 'StringLength':
+            bid = 'GetStringLength'
+        elif bid == 'StringLengthUTF':
+            bid = 'GetStringUTFLength'
+        elif bid == 'ReadUnicode':
+            bid = 'ReadString'
+        elif bid == 'ReadUnicodeCritical':
+            bid = 'ReadStringCritical'
+        elif bid == 'ReadUTF':
+            bid = 'ReadStringUTF'
+        else:
+            rename = False
+        if rename:
+            benchmark['id'] = bid
 
     single_type = None
     if (benchmark.get('parameter_count') == 0):
