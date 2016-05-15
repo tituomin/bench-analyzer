@@ -255,6 +255,7 @@ def plot(
         keys_to_remove=None, select_predicate=None,
         group=None, variable=None, measure=None,
         title=None, style=None, min_series_width=1,
+        key_placement='inside top left',
         identifier=None,
         revision=None, checksum=None, output='pdf'):
 
@@ -304,7 +305,9 @@ def plot(
 
         gnuplot.output_plot(
             headers, rows, plotpath, gnuplot_script,
-            title, specs, style, plot.page, identifier + id_suffix, axes_label, output=output)
+            title, specs, style, plot.page, identifier + id_suffix, axes_label, output=output,
+            key_placement=key_placement
+        )
 
         metadata_file.write("\n\n{0}\n{1}\n\n".format(title, identifier + id_suffix))
 

@@ -105,7 +105,7 @@ set label 2 "{page}" at screen 0.9, screen 0.95
 
 TEMPLATES['simple_groups'] = """
 set xlabel "{xlabel}"
-set key inside top left box notitle width -3 height +1
+set key {key_placement} box notitle width -3 height +1
 plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with points ls I-1
 """
 
@@ -169,7 +169,7 @@ GROUPTITLES={
 def output_plot(data_headers, data_rows, plotpath,
                 plotscript, title, specs, style, page,
                 identifier,
-                xlabel, additional_data=None, output='pdf'):
+                xlabel, additional_data=None, output='pdf', key_placement="inside top left"):
     global plot_directory
     template = TEMPLATES[style]
 
@@ -232,7 +232,7 @@ def output_plot(data_headers, data_rows, plotpath,
     else:
         grouptitle = GROUPTITLES.get(specs['group'], 'group')
         plotscript.write(template.format(
-            title = title, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
+            title = title, key_placement=key_placement, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
             xlabel = xlabel, miny=miny, grouptitle=grouptitle))
 
 
