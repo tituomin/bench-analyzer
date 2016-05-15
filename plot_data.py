@@ -903,8 +903,8 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
             #if not output_command:
             command_parts.extend([
                 "-g graph,0,caller",
-                "--parent='dvmPlatformInvoke'",
-                "-s parent",
+                #"--parent='dvmPlatformInvoke'",
+                #"-s parent",
                 "--stdio",
                 "| c++filt",
                 ">/tmp/out.txt"
