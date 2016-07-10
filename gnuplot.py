@@ -179,7 +179,7 @@ def output_plot(data_headers, data_rows, plotpath,
         if specs['variable'] == 'dynamic_size':
             plotscript.write("set xrange [0:512]\n")
             plotscript.write("set xtics 0, 64\n")
-            plotscript.write("set format x \"%6.st\"\n")
+            plotscript.write("set format x \"%6.sB\"\n")
         else:
             plotscript.write("unset xtics\n")
             plotscript.write("set xtics autofreq\n")
