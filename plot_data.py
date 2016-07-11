@@ -109,6 +109,8 @@ def add_derived_values(benchmark, latex=False):
             bid = 'ReadStringCritical'
         elif bid == 'ReadUTF':
             bid = 'ReadStringUTF'
+        elif bid == 'ReadUtf':
+            bid = 'ReadStringUTF'
         elif bid == 'ReadObjectArrayElement':
             bid = 'GetObjectArrayElement'
         elif bid == 'WriteObjectArrayElement':
@@ -661,7 +663,7 @@ def plot_benchmarks(
     # had: sort 'response_time', min_series_width: 2 , unused?
 
     def utf(b):
-        return 'UTF' in b['id']
+        return 'UTF' in b['id'] or 'Utf' in b['id']
 
     filters = {
         'utf': utf,
