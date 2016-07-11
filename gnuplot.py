@@ -131,7 +131,7 @@ TEMPLATES['histogram'] = """
 unset xlabel
 #set xlabel "{xlabel}" rotate
 unset ylabel
-set y2label "vasteaika {reps}"
+set y2label "vasteaika {reps} toistolla"
 set size 2, 2
 unset x2tics
 #unset xtics
@@ -250,7 +250,7 @@ def output_plot(data_headers, data_rows, plotpath,
         grouptitle = GROUPTITLES.get(specs['group'], 'group')
         plotscript.write(template.format(
             title = title, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
-            key_placement = key_placement, xlabel = xlabel, miny=miny, grouptitle=grouptitle))
+            key_placement = key_placement, xlabel = xlabel, reps=reps, miny=miny, grouptitle=grouptitle))
 
 
 def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None, convert_to_seconds=False):
