@@ -265,6 +265,11 @@ def plot(
         identifier=None,
         revision=None, checksum=None, output='pdf'):
 
+    if len(benchmarks) > 0 and benchmarks[0].get('is_allocating'):
+        identifier += '-alloc'
+    if len(benchmarks) > 0:
+        reps = benchmarks[0].get('repetitions')
+
     filtered_benchmarks = [
         without(keys_to_remove, x)
         for x in benchmarks
@@ -312,7 +317,7 @@ def plot(
         gnuplot.output_plot(
             headers, rows, plotpath, gnuplot_script,
             title, specs, style, plot.page, identifier + id_suffix, axes_label, output=output,
-            key_placement=key_placement
+            key_placement=key_placement, reps=reps
         )
 
         metadata_file.write("\n\n{0}\n{1}\n\n".format(title, identifier + id_suffix))
@@ -360,7 +365,7 @@ def plot(
             plot.page += 1
             gnuplot.output_plot(
                 headers + headers[1:], fitted_curves, plotpath, gnuplot_script,
-                title, specs, 'fitted_lines', plot.page, identifier + id_suffix + '-fit', axes_label, output=output)
+                title, specs, 'fitted_lines', plot.page, identifier + id_suffix + '-fit', axes_label, output=output, reps=reps)
 
             def simplified_function(poly):
                 return "{:.3g} * x {:+.3g}".format(poly[0], poly[1])
@@ -1090,6 +1095,7 @@ if __name__ == '__main__':
 
     global_values = {
         'repetitions': first_measurement['repetitions'],
+        'is_allocating': first_measurement['benchmark-set'] == 'ALLOC',
         'multiplier': multiplier
     }
 

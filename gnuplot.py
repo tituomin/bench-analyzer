@@ -63,7 +63,6 @@ set output
 INIT_PLOTS_COMMON = """
 set grid
 set xlabel "kutsuparametrien määrä"
-set ylabel "vasteaika"
 """
 
 INIT_PLOT_LABEL_PDF = """
@@ -109,11 +108,13 @@ set key {key_placement} box notitle width -3 height +1
 """
 
 TEMPLATES['simple_groups'] = """
+set ylabel "vasteaika {reps} toistolla"
 set xlabel "{xlabel}"
 plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with points ls I-1
 """
 
 TEMPLATES['fitted_lines'] = """
+set ylabel "vasteaika {reps} toistolla"
 set xlabel "{xlabel}"
 plot for [I=2:{last_real_column}] '{filename}' index {index} using 1:I title columnhead with points ls I-1, \
 for [I={first_fitted_column}:{last_column}] '{filename}' index {index} using 1:I notitle with lines ls I-{first_fitted_column}+1
@@ -130,7 +131,7 @@ TEMPLATES['histogram'] = """
 unset xlabel
 #set xlabel "{xlabel}" rotate
 unset ylabel
-set y2label "vasteaika"
+set y2label "vasteaika {reps}"
 set size 2, 2
 unset x2tics
 #unset xtics
@@ -173,7 +174,7 @@ GROUPTITLES={
 def output_plot(data_headers, data_rows, plotpath,
                 plotscript, title, specs, style, page,
                 identifier,
-                xlabel, additional_data=None, output='pdf', key_placement="inside top left"):
+                xlabel, additional_data=None, output='pdf', key_placement="inside top left", reps='XXX-fixme-XXX'):
     global plot_directory
     template = TEMPLATES[style]
 
@@ -230,7 +231,7 @@ def output_plot(data_headers, data_rows, plotpath,
         last_real_column = 1 + length / 2
         first_fitted_column = last_real_column + 1
         plotscript.write(template.format(
-           title = title, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
+           title = title, reps = reps, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
            xlabel = xlabel, miny=miny, last_real_column=last_real_column, first_fitted_column=first_fitted_column))
 
     elif style == 'simple_groups':
@@ -242,7 +243,7 @@ def output_plot(data_headers, data_rows, plotpath,
                 key_placement=key_placement))
 
         plotscript.write(template.format(
-            title = title, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
+            title = title, reps = reps, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
             xlabel = xlabel, miny=miny, grouptitle=grouptitle))
 
     else:
