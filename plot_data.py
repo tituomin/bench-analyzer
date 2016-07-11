@@ -539,11 +539,14 @@ def plot_benchmarks(
         if bm['no'] == -1 and 'Overhead' in bm ['id']]
     for loop_type in ['AllocOverhead', 'NormalOverhead']:
         for from_lang in ['C', 'J']:
+            language_name = from_lang
+            if language_name == 'J': language_name = 'Java'
             overhead_estimates[from_lang] = {}
             overhead_data = plot(
                 overhead_benchmarks, gnuplotcommands, plotpath, metadata_file,
                 style='simple_groups',
-                title='Mittauksen perusrasite',
+                key_placement=None,
+                title='Mittauksen perusrasite ({})'.format(language_name),
                 identifier='{}-{}'.format(loop_type.lower(), from_lang.lower()),
                 keys_to_remove=[],
                 select_predicate=(
@@ -791,7 +794,8 @@ def plot_benchmarks(
         identifier='special-calls-non-dynamic',
         select_predicate=(
             lambda x: (
-                x['dynamic_variation'] == 0)),
+                x['dynamic_variation'] == 0 and
+                'Field' in x['id'])),
         group='direction',
         measure='response_time',
         variable='id',
@@ -855,6 +859,8 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
             return False
         if dynamic_size and m.get('dynamic_size') != int(dynamic_size):
             return False
+        if 'Filename' not in m or m['Filename'] is None:
+            return False
         return True
 
     datafiles = []
@@ -865,6 +871,7 @@ def render_perf_reports_for_measurement(identifier, measurements, measurement_pa
             measurement_zipfile = zipfile.ZipFile(zpath, 'r')
             datafiles.append({
                 'zip': measurement_zipfile,
+                'zip_path': zpath,
                 'mid': mid,
                 'csv': measurement_zipfile.open('{0}/benchmarks-{0}.csv'.format(mid))
             })

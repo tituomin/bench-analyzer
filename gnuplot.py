@@ -71,6 +71,7 @@ set label 1 "{bid}" at graph 0.01, graph 1.06
 """
 
 TEMPLATES = {}
+INIT_KEY = {}
 
 TEMPLATES['binned_init'] = """
 set title '{title}
@@ -103,9 +104,12 @@ set title '{title}'
 set label 2 "{page}" at screen 0.9, screen 0.95
 """
 
+INIT_KEY['simple_groups'] = """
+set key {key_placement} box notitle width -3 height +1
+"""
+
 TEMPLATES['simple_groups'] = """
 set xlabel "{xlabel}"
-set key {key_placement} box notitle width -3 height +1
 plot for [I=2:{last_column}] '{filename}' index {index} using 1:I title columnhead with points ls I-1
 """
 
@@ -122,7 +126,7 @@ plot for [I=2:{last_column}] '{filename}' index {index} using I:xtic(1) title co
 """
 
 TEMPLATES['histogram'] = """
-set terminal epslatex input color header ""
+#set xlabel "{xlabel}"
 unset xlabel
 #set xlabel "{xlabel}" rotate
 unset ylabel
@@ -229,11 +233,23 @@ def output_plot(data_headers, data_rows, plotpath,
            title = title, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
            xlabel = xlabel, miny=miny, last_real_column=last_real_column, first_fitted_column=first_fitted_column))
 
+    elif style == 'simple_groups':
+        grouptitle = GROUPTITLES.get(specs['group'], 'group')
+        if key_placement is None:
+            plotscript.write("\nunset key\n")
+        else:
+            plotscript.write(INIT_KEY[style].format(
+                key_placement=key_placement))
+
+        plotscript.write(template.format(
+            title = title, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
+            xlabel = xlabel, miny=miny, grouptitle=grouptitle))
+
     else:
         grouptitle = GROUPTITLES.get(specs['group'], 'group')
         plotscript.write(template.format(
-            title = title, key_placement=key_placement, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
-            xlabel = xlabel, miny=miny, grouptitle=grouptitle))
+            title = title, page = identifier, filename = filename, index = 0, last_column = len(data_rows[0]),
+            key_placement = key_placement, xlabel = xlabel, miny=miny, grouptitle=grouptitle))
 
 
 def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None, convert_to_seconds=False):
