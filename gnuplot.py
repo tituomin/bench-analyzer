@@ -221,6 +221,8 @@ def output_plot(data_headers, data_rows, plotpath,
         filename = os.path.join(plotpath, "plot-" + str(uuid.uuid4()) + ".data")
         plotdata = open(filename, 'w')
         specs['convert_to_seconds'] = False # (output == 'latex')
+        if output == 'latex':
+            specs['tinylabels'] = True
         plotdata.write(print_benchmarks(data_headers, data_rows, title, **specs))
 
     miny = 0
@@ -266,13 +268,16 @@ def output_plot(data_headers, data_rows, plotpath,
             key_placement = key_placement, xlabel = xlabel, reps=reps, miny=miny, grouptitle=grouptitle))
 
 
-def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None, convert_to_seconds=False):
+def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None, convert_to_seconds=False, tinylabels=False):
     result = '#{0}\n'.format(title)
     if group and variable and measure:
         result = '#measure:{m} variable:{v} group:{g}'.format(
             m=measure, v=variable, g=group)
 
-    result = " ".join([format_value("{}".format(k)) for k in data_headers])
+    prefix = ""
+    if tinylabels:
+        prefix = "\\\\tiny "
+    result = " ".join([format_value("{}{}".format(prefix, k)) for k in data_headers])
     result += '\n'
 
     for row in data_rows:
