@@ -60,6 +60,13 @@ set format y "%4.2s%cs"
 set output
 """
 
+INIT_PLOTS_SVG = """
+set terminal svg
+set pointsize 1.0
+set format y "%4.2s%cs"
+set output
+"""
+
 INIT_PLOTS_COMMON = """
 set grid
 set xlabel "kutsuparametrien määrä"
@@ -178,8 +185,14 @@ def output_plot(data_headers, data_rows, plotpath,
     global plot_directory
     template = TEMPLATES[style]
 
-    if output == 'latex':
-        plotscript.write(INIT_PLOTS_LATEX.format(caption=title,label=identifier))
+    if output in ['latex', 'svg']:
+        if output == 'latex':
+            init_tmpl = INIT_PLOTS_LATEX
+            file_suffix = 'tex'
+        elif output == 'svg':
+            init_tmpl = INIT_PLOTS_SVG
+            file_suffix = 'svg'
+        plotscript.write(init_tmpl.format(caption=title,label=identifier))
         # if page > 48: # Hardcoding ...
         if specs['variable'] == 'dynamic_size':
             plotscript.write("set xrange [0:512]\n")
@@ -201,7 +214,7 @@ def output_plot(data_headers, data_rows, plotpath,
 
         plotscript.write("set output '{}'".format(
             os.path.join(plot_directory,
-                         "plot-{}-{}.tex".format(measurement_id, identifier))))
+                         "plot-{}-{}.{}".format(measurement_id, identifier, file_suffix))))
 
     if plotpath:
         # external data
@@ -259,7 +272,7 @@ def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, 
         result = '#measure:{m} variable:{v} group:{g}'.format(
             m=measure, v=variable, g=group)
 
-    result = " ".join([format_value("\\\\tiny {}".format(k)) for k in data_headers])
+    result = " ".join([format_value("{}".format(k)) for k in data_headers])
     result += '\n'
 
     for row in data_rows:

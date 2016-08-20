@@ -69,7 +69,7 @@ def format_direction(fr, to, latex):
 
 DIRECTIONS = [('C', 'J'), ('J', 'C'), ('J', 'J'), ('C', 'C')]
 
-def preprocess_benchmarks(benchmarks, global_values, latex=False):
+def preprocess_benchmarks(benchmarks, global_values, latex=None):
     # For allocating benchmarks, the repetition count for individual benchmarks
     # come from the datafile. For non-allocating, it is a global value.
     keys = set([key for b in benchmarks for key in b.keys()])
@@ -80,7 +80,7 @@ def preprocess_benchmarks(benchmarks, global_values, latex=False):
         add_global_values(b, global_values)
     return benchmarks
 
-def add_derived_values(benchmark, latex=False):
+def add_derived_values(benchmark, latex=None):
     # migration - todo - remove
     if benchmark.get('response_time_millis') != None:
         benchmark['response_time'] = benchmark.get('response_time_millis')
@@ -429,7 +429,7 @@ def binned_value(minimum, width, value):
     return width * (int(value - minimum) / int(width)) + minimum
 
 
-def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None, latex=False, **kwargs):
+def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file, plot_type=None, latex=None, **kwargs):
 
     output_type = 'screen'
     if plot_type != 'animate':
@@ -521,11 +521,13 @@ def plot_distributions(all_benchmarks, output, plotpath, gnuplotcommands, bid, m
 
 def plot_benchmarks(
         all_benchmarks, output, plotpath, gnuplotcommands, bid, metadata_file,
-        plot_type=None, revision=None, checksum=None, latex=False):
+        plot_type=None, revision=None, checksum=None, latex=None):
 
     output_type = 'pdf'
-    if latex:
+    if latex == 'plotlatex':
         output_type = 'latex'
+    elif latex == 'plotsvg':
+        output_type = 'svg'
 
     gnuplot.init(gnuplotcommands, output, bid, output_type=output_type)
 
@@ -956,10 +958,13 @@ if __name__ == '__main__':
     output_path = argv[2]
 
     if 'plotlatex' in method:
-        latex = True
+        latex = 'plotlatex'
+        method = 'curves'
+    elif 'plotsvg' in method:
+        latex = 'plotsvg'
         method = 'curves'
     else:
-        latex = False
+        latex = None
 
     output_command = False
     if len(argv) > 5:
@@ -1114,7 +1119,7 @@ if __name__ == '__main__':
         benchmark_group_id = os.getenv('PLOT_ID', str(uuid.uuid4()))
         plot_prefix = 'plot-{0}'.format(benchmark_group_id)
 
-        if latex:
+        if latex is not None:
             output_filename = os.path.join(output_path, plot_prefix)
         else:
             output_filename = os.path.join(output_path, plot_prefix + '.pdf')
