@@ -139,7 +139,7 @@ unset xlabel
 #set xlabel "{xlabel}" rotate
 unset ylabel
 set y2label "vasteaika {reps} toistolla"
-set size 2, 2
+set size 1, 1
 unset x2tics
 #unset xtics
 unset ytics
