@@ -48,20 +48,20 @@ set palette defined ( 0 '#1B9E77',\
 """
 
 INIT_PLOTS_PDF = """
-set terminal pdfcairo size 32cm,18cm
+set terminal pdfcairo size 32cm,18cm {sizesuffix}
 set size 1, 0.95
 set output '{filename}'
 """
 
 INIT_PLOTS_LATEX = """
-set terminal epslatex input color header "\\\\caption{{{caption}}}\\\\label{{fig:{label}}}"
+set terminal epslatex input color header "\\\\caption{{{caption}}}\\\\label{{fig:{label}}}" {sizesuffix}
 set pointsize 1.0
 set format y "%4.2s%cs"
 set output
 """
 
 INIT_PLOTS_SVG = """
-set terminal svg
+set terminal svg {sizesuffix}
 set pointsize 1.0
 set format y "%4.2s%cs"
 set output
@@ -111,7 +111,7 @@ set label 2 "{page}" at screen 0.9, screen 0.95
 """
 
 INIT_KEY['simple_groups'] = """
-set key {key_placement} box notitle width -3 height +1
+set key {key_placement} box notitle width -3 height +1 vertical
 """
 
 TEMPLATES['simple_groups'] = """
@@ -185,6 +185,22 @@ def output_plot(data_headers, data_rows, plotpath,
     global plot_directory
     template = TEMPLATES[style]
 
+    rowlen = len(data_rows[0]) - 1
+    size = 'normal'
+    if style == 'fitted_lines':
+        rowlen /= 2
+    if (page > 51 and rowlen > 7) or rowlen > 10:
+        size = 'tall'
+    if rowlen < 15:
+        size = 'normal'
+    if identifier in [
+        'basic-call-all-types-j-j-fit',
+        'basic-call-all-types-c-c-fit',
+        'variable-argument-size-j-c',
+        'special-calls-arrayelements-c-j-fit',
+        'special-calls-arrayregion-c-j-fit']:
+        size = 'tall'
+
     if output in ['latex', 'svg']:
         if output == 'latex':
             init_tmpl = INIT_PLOTS_LATEX
@@ -192,7 +208,22 @@ def output_plot(data_headers, data_rows, plotpath,
         elif output == 'svg':
             init_tmpl = INIT_PLOTS_SVG
             file_suffix = 'svg'
-        plotscript.write(init_tmpl.format(caption=title,label=identifier))
+        sizesuffix=''
+        if size == 'tall':
+            if output == 'svg':
+                sizesuffix = 'size 1000,800'
+            else:
+                sizesuffix="size 15cm,13cm"
+        else:
+            if output == 'svg':
+                sizesuffix="size 1000,600"
+            else:
+                sizesuffix="size 15cm,10cm"
+        plotscript.write(
+            init_tmpl.format(
+                caption=title,
+                label=identifier,
+                sizesuffix=sizesuffix))
         # if page > 48: # Hardcoding ...
         if specs['variable'] == 'dynamic_size':
             plotscript.write("set xrange [0:512]\n")
@@ -203,15 +234,15 @@ def output_plot(data_headers, data_rows, plotpath,
             plotscript.write("set xtics autofreq\n")
             plotscript.write("set xrange [*:*]\n")
             plotscript.write("set format x \"%6.s\"\n")
-        rowlen = len(data_rows[0]) - 1
-        if style == 'fitted_lines':
-            rowlen /= 2
-        if (page > 51 and rowlen > 7) or rowlen > 10:
-            plotscript.write("set key outside bottom center\n");
-            plotscript.write("set size 1, 2\n");
-        if rowlen < 15:
-            plotscript.write("set size 1, 1\n");
 
+        if size == 'tall':
+            if identifier in ['special-calls-arrayelements-c-j-fit',
+                              'special-calls-arrayregion-c-j-fit']:
+                plotscript.write("set tmargin at screen 0.8\nset key above box horizontal maxrows 8 maxcols 4 samplen 1 spacing .5 font \",4\"\n");
+            else:
+                plotscript.write("set tmargin at screen 0.85\nset key above nobox horizontal\n");
+        else:
+            plotscript.write("set tmargin at screen 0.95\n")
         plotscript.write("set output '{}'".format(
             os.path.join(plot_directory,
                          "plot-{}-{}.{}".format(measurement_id, identifier, file_suffix))))
@@ -223,6 +254,8 @@ def output_plot(data_headers, data_rows, plotpath,
         specs['convert_to_seconds'] = False # (output == 'latex')
         if output == 'latex':
             specs['tinylabels'] = True
+        if output == 'svg':
+            specs['scriptlabels'] = True
         plotdata.write(print_benchmarks(data_headers, data_rows, title, **specs))
 
     miny = 0
@@ -253,7 +286,7 @@ def output_plot(data_headers, data_rows, plotpath,
         grouptitle = GROUPTITLES.get(specs['group'], 'group')
         if key_placement is None:
             plotscript.write("\nunset key\n")
-        else:
+        elif size != 'tall':
             plotscript.write(INIT_KEY[style].format(
                 key_placement=key_placement))
 
@@ -268,16 +301,20 @@ def output_plot(data_headers, data_rows, plotpath,
             key_placement = key_placement, xlabel = xlabel, reps=reps, miny=miny, grouptitle=grouptitle))
 
 
-def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None, convert_to_seconds=False, tinylabels=False):
+def print_benchmarks(data_headers, data_rows, title, group=None, variable=None, measure=None, convert_to_seconds=False, tinylabels=False, scriptlabels=False):
     result = '#{0}\n'.format(title)
     if group and variable and measure:
         result = '#measure:{m} variable:{v} group:{g}'.format(
             m=measure, v=variable, g=group)
 
     prefix = ""
+    suffix = ""
     if tinylabels:
         prefix = "\\\\tiny "
-    result = " ".join([format_value("{}{}".format(prefix, k)) for k in data_headers])
+    elif scriptlabels:
+        prefix = "\\\\tiny{"
+        suffix = "}"
+    result = " ".join([format_value("{}{}{}".format(prefix, k, suffix)) for k in data_headers])
     result += '\n'
 
     for row in data_rows:
